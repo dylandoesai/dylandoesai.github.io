@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Dylan's rotating 12-hour shift schedule at the glass container plant.",
+    "",
+    "Two ways to populate this:",
+    "  1. PATTERN MODE  -- if your rotation follows a fixed repeating pattern",
+    "     (e.g. 'Panama' or 'DuPont' or '2-2-3'), set 'mode' = 'pattern' and",
+    "     fill in 'pattern' as the sequence of shift letters for one cycle:",
+    "        D = day shift (e.g. 6am-6pm)",
+    "        N = night shift (e.g. 6pm-6am)",
+    "        O = off",
+    "     Plus 'anchor_date' = a date you KNOW the first letter of the",
+    "     pattern applies to. Penelope rolls forward from there.",
+    "",
+    "  2. CALENDAR MODE -- if your rotation is irregular, list explicit",
+    "     dates. Set 'mode' = 'calendar' and fill in 'days' as an array of",
+    "     {date, shift} entries. Shift letters as above.",
+    "",
+    "Dylan can send Penelope a photo of his printed schedule and she'll",
+    "fill this file in for him (vision read on the photo).",
+    "",
+    "Times default to 6am-6pm for day, 6pm-6am for night. Override per-day",
+    "by adding 'start' and 'end' fields (HH:MM, 24h)."
+  ],
+
+  "mode": "calendar",
+  "crew": "D",
+  "plant": "O-I Kalama",
+  "shift_times": {
+    "day":   { "start": "07:00", "end": "19:00" },
+    "night": { "start": "19:00", "end": "07:00" }
+  },
+
+  "pattern": {
+    "anchor_date": "",
+    "sequence": []
+  },
+
+  "_days_comment": "2026 schedule (crew D) below; one entry per shift day. Shape: {\"date\": \"2026-01-02\", \"shift\": \"D\"} (D = day, N = night). Days not listed = days off.",
+  "days": []
+}

@@ -15,6 +15,12 @@
 
   "revenue_milestones": [500, 1000, 2500, 5000, 10000, 25000],
 
+  "knowledge_paths": [
+    "~/Documents/notes",
+    "~/Documents/journal",
+    "~/Documents/projects"
+  ],
+
   "wake_song": {
     "service": "spotify",
     "spotify_uri": "",
