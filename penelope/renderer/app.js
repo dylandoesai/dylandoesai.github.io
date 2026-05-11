@@ -23,7 +23,9 @@ const state = {
 async function boot() {
   state.cfg = (await window.penelope.readConfig('config.json')) || {};
 
-  // Load face landmarks (user-supplied Penelope mesh if available)
+  // Load face geometry: prefer real MediaPipe JSON if extract_face_mesh.py
+  // has been run, otherwise fall back to the PC-tuned procedural mesh
+  // baked into face-landmarks.js.
   const lm = await loadFaceLandmarks();
   console.log(`face mesh: ${lm.source} (${lm.count} points)`);
 

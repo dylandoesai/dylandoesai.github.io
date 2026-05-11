@@ -19,7 +19,7 @@
 // The shader displaces particles based on uniforms set from the JS layer.
 
 import * as THREE from 'three';
-import { FACE_LANDMARKS } from './face-landmarks.js';
+import { FACE_POINTS } from './face-landmarks.js';
 
 const VERT = /* glsl */ `
   attribute float aSeed;
@@ -176,89 +176,30 @@ export class PenelopeFace {
   }
 
   _buildGeometry() {
-    // FACE_LANDMARKS: array of [x,y,z] normalized to roughly [-0.5..0.5].
-    // We expand each landmark into ~6-10 particles depending on its cluster.
-    const positions = [];
-    const seeds = [];
-    const clusters = [];
+    // FACE_POINTS = { positions: [[x,y,z], ...], clusters: [int, ...] }
+    // Already pre-classified per-point by face-landmarks.js (either from a
+    // real MediaPipe extraction of her photos, or the PC-tuned procedural
+    // mesh). Each anchor point becomes one shader particle.
+    const src = FACE_POINTS;
+    const n = src.positions.length;
+    const positions = new Float32Array(n * 3);
+    const seeds = new Float32Array(n);
+    const clusters = new Float32Array(n);
 
-    const pushParticle = (base, cluster, jitter = 0.005) => {
-      const x = base[0] + (Math.random() - 0.5) * jitter;
-      const y = base[1] + (Math.random() - 0.5) * jitter;
-      const z = base[2] + (Math.random() - 0.5) * jitter;
-      positions.push(x, y, z);
-      seeds.push(Math.random() * 100);
-      clusters.push(cluster);
-    };
-
-    // Cluster classification by landmark index (FaceMesh canonical):
-    //   1 = skull/face shell (default)
-    //   2 = jawline
-    //   3 = lips/mouth
-    //   4 = eyes
-    //   5 = cheeks
-    //   6 = brows
-    const JAW_IDX = new Set([
-      // chin contour 152..400 region (a few canonical jaw points)
-      152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234,
-      454, 323, 361, 288, 397, 365, 379, 378, 400,
-    ]);
-    const LIPS_IDX = new Set([
-      // outer + inner lip ring
-      61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291,
-      78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308,
-      0, 267, 269, 270, 13, 82, 37, 39, 40, 185,
-    ]);
-    const LEFT_EYE = new Set([33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]);
-    const RIGHT_EYE = new Set([263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466]);
-    const CHEEKS = new Set([50, 101, 36, 205, 187, 280, 330, 266, 425, 411]);
-    const BROWS = new Set([
-      70, 63, 105, 66, 107, 55, 65, 52, 53, 46,
-      300, 293, 334, 296, 336, 285, 295, 282, 283, 276,
-    ]);
-
-    const clusterOf = (i) => {
-      if (LIPS_IDX.has(i)) return 3;
-      if (LEFT_EYE.has(i) || RIGHT_EYE.has(i)) return 4;
-      if (CHEEKS.has(i)) return 5;
-      if (BROWS.has(i)) return 6;
-      if (JAW_IDX.has(i)) return 2;
-      return 1;
-    };
-
-    const densityOf = (c) => {
-      if (c === 3) return 14; // lips dense (lip sync visibility)
-      if (c === 4) return 10; // eyes dense
-      if (c === 2) return 8;
-      if (c === 5) return 6;
-      if (c === 6) return 6;
-      return 4; // skull default
-    };
-
-    for (let i = 0; i < FACE_LANDMARKS.length; i++) {
-      const c = clusterOf(i);
-      const n = densityOf(c);
-      for (let k = 0; k < n; k++) pushParticle(FACE_LANDMARKS[i], c);
-    }
-
-    // Ambient backdrop particles (per user spec: "Black + ambient particle field")
-    const AMBIENT = 1800;
-    for (let i = 0; i < AMBIENT; i++) {
-      const r = 1.6 + Math.random() * 1.4;
-      const t = Math.random() * Math.PI * 2;
-      const p = (Math.random() - 0.5) * Math.PI;
-      pushParticle([
-        r * Math.cos(p) * Math.cos(t) * 0.7,
-        r * Math.sin(p) * 0.5,
-        -1.2 - Math.random() * 1.5,
-      ], 7, 0.0);
+    for (let i = 0; i < n; i++) {
+      const p = src.positions[i];
+      positions[i * 3 + 0] = p[0];
+      positions[i * 3 + 1] = p[1];
+      positions[i * 3 + 2] = p[2];
+      seeds[i] = Math.random() * 100;
+      clusters[i] = src.clusters[i];
     }
 
     const geom = new THREE.BufferGeometry();
-    geom.setAttribute('aBase', new THREE.Float32BufferAttribute(positions, 3));
-    geom.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
-    geom.setAttribute('aCluster', new THREE.Float32BufferAttribute(clusters, 1));
-    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('aBase', new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+    geom.setAttribute('aCluster', new THREE.BufferAttribute(clusters, 1));
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -271,6 +212,19 @@ export class PenelopeFace {
 
     this.points = new THREE.Points(geom, mat);
     this.scene.add(this.points);
+  }
+
+  rebuild() {
+    // Called when face-landmarks.js loads a different mesh (e.g. real
+    // MediaPipe JSON arrives after init). Drops the old geometry and
+    // rebuilds from the current FACE_POINTS.
+    if (this.points) {
+      this.scene.remove(this.points);
+      this.points.geometry.dispose();
+      this.points.material.dispose();
+      this.points = null;
+    }
+    this._buildGeometry();
   }
 
   _handleResize() {
