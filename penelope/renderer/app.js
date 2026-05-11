@@ -36,17 +36,13 @@ async function boot() {
   // explicitly when the wake-phrase fires.
   state.face.uniforms.uBootProgress.value = 1;
 
-  // Audio analysers (one for TTS, one for the wake-song)
+  // Audio analyser drives shader reactivity from her TTS.
+  // (The wake song plays through Spotify on the system level — not
+  // routed through the renderer — so during the song the face shows
+  // its idle breathing rather than FFT-driven motion.)
   state.audio = new AudioAnalyzer($('tts-audio'));
-  state.audioBoot = new AudioAnalyzer($('papis-home-audio'));
-
-  // Drive shader reactivity from whichever audio is currently producing sound
   function reactivityTick() {
-    const a = state.audio.sample();
-    const b = state.audioBoot.sample();
-    // pick the louder source
-    const src = a.amp > b.amp ? a : b;
-    state.face.setReactivity(src);
+    state.face.setReactivity(state.audio.sample());
     requestAnimationFrame(reactivityTick);
   }
   reactivityTick();
@@ -134,25 +130,17 @@ async function handleWake(data) {
   // Scatter face for the assembly
   state.face.uniforms.uBootProgress.value = 0;
 
-  const song = $('papis-home-audio');
+  // Full wake -> tell Python to start the wake song in Spotify
   if (isFullWake) {
-    // Play Drake every single time (per spec)
-    const songB64 = await window.penelope.readAsset('assets/songs/papis_home.mp3');
-    if (songB64) {
-      song.src = `data:audio/mpeg;base64,${songB64}`;
-      song.currentTime = 0;
-    } else {
-      song.removeAttribute('src');
+    try { await window.penelope.call('play_wake_song', {}); } catch (e) {
+      console.warn('wake song failed', e);
     }
-  } else {
-    song.removeAttribute('src');
   }
 
   const panels = [$('left-panel'), $('right-panel'), $('bottom-panel')];
   await runBootSequence({
     face: state.face,
     panels,
-    song: isFullWake ? song : null,
     bootEl: $('boot-overlay'),
     statusEl: $('status-text'),
     duration: isFullWake ? 12000 : 2500,
@@ -160,6 +148,8 @@ async function handleWake(data) {
   });
 
   if (isFullWake) {
+    // Fade Spotify down so the greeting is audible, then deliver brief
+    try { await window.penelope.call('stop_wake_song', {}); } catch {}
     await window.penelope.call('daily_brief', {});
   } else {
     await window.penelope.call('quick_greeting', {});

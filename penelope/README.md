@@ -9,8 +9,10 @@ agent capabilities.
 
 Two wake phrases:
 
-- **"Papi's home"** → fullscreen opens, plays Drake's *Papi's Home* every
-  time, 12-second cinematic particle assembly, then the full daily brief.
+- **"Papi's home"** → fullscreen opens, **Spotify plays Drake's *Papi's
+  Home* every time** (via the AppleScript bridge — no local MP3), 12-
+  second cinematic particle assembly, then Spotify fades out and the
+  full daily brief begins.
 - **"Hey Penelope"** → fullscreen opens with a fast ~2.5-second assembly,
   no song, no brief. She just answers: *"Yes, dear?" / "Yes, daddy?" /
   "What can I do for you?"* and starts listening.
@@ -138,7 +140,7 @@ penelope/
 │   ├── face-mesh.json                  # generated from your photos
 │   ├── reference/                      # YOU drop PC photos here
 │   ├── owner_faces/                    # YOU drop photos of yourself
-│   └── songs/                          # papis_home.mp3 lives here
+│   └── songs/                          # legacy (wake song now via Spotify)
 │
 └── scripts/
     ├── setup.sh                        # one-shot installer
@@ -151,8 +153,9 @@ penelope/
 cd penelope
 ./scripts/setup.sh
 # Drop Penelope photos in assets/reference/
-python python/extract_face_mesh.py assets/reference/*.jpg
-# Drop papis_home.mp3 in assets/songs/
+python python/extract_face_mesh.py assets/reference/*
+# In Spotify: right-click "Papi's Home" by Drake -> Share -> Copy Spotify URI
+# Paste it into config/config.json -> wake_song.spotify_uri
 # (optional) drop YOUR photos in assets/owner_faces/
 ./scripts/run.sh
 ```
@@ -332,7 +335,7 @@ Developer ID for distribution.
 | Hotword never triggers | Check mic permission. Lower VAD aggressiveness in `vad_listener.py` from 2 → 1. |
 | Reminders/Calendar empty | Grant Apple-events automation permission in System Settings. |
 | upload-post returns empty | Verify API key in `config.json` and that nicknames match your dashboard. |
-| Song doesn't play | Verify `assets/songs/papis_home.mp3` exists and is a valid mp3. |
+| Song doesn't play | Open Spotify on your Mac, log in. Verify `config.json -> wake_song.spotify_uri` is set. Test: `osascript -e 'tell application "Spotify" to play track "<your URI>"'`. |
 | Webcam off / no face_seen events | System Settings → Privacy → Camera → enable. Set `assets/owner_faces/` if face detection should be identity-aware. |
 | TTS sounds wrong/robotic | Audition voices via devtools: `await window.penelope.call('ask', {text: 'test'})` after editing `tts_voice` in config. |
 

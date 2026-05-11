@@ -27,7 +27,46 @@ def previous_track():  _osa('tell application "Spotify" to previous track')
 
 
 def play_uri(uri: str):
-    _osa(f'tell application "Spotify" to play track "{uri}"')
+    """Play a track, album, or playlist. Accepts either a spotify: URI or
+    an open.spotify.com share URL."""
+    if not uri:
+        return False
+    uri = uri.strip()
+    # Convert share URL to URI if needed
+    if uri.startswith("http"):
+        # https://open.spotify.com/track/<id>?si=...  ->  spotify:track:<id>
+        import re
+        m = re.search(r"open\.spotify\.com/(track|album|playlist|episode)/([A-Za-z0-9]+)", uri)
+        if m:
+            uri = f"spotify:{m.group(1)}:{m.group(2)}"
+    # Make sure Spotify is open first (launch silently if not)
+    _osa('tell application "Spotify" to activate')
+    # Escape quotes for AppleScript safety
+    safe = uri.replace('"', '\\"')
+    _osa(f'tell application "Spotify" to play track "{safe}"')
+    return True
+
+
+def set_volume(level: int):
+    """Volume 0-100."""
+    level = max(0, min(100, int(level)))
+    _osa(f'tell application "Spotify" to set sound volume to {level}')
+
+
+def fade_out(duration_s: float = 4.0, steps: int = 20):
+    """Smooth volume fade to 0 then pause. Used at end of wake song."""
+    import time
+    try:
+        cur = _osa('tell application "Spotify" to sound volume')
+        start = int(cur) if cur.isdigit() else 80
+    except Exception:
+        start = 80
+    for i in range(steps + 1):
+        v = int(start * (1 - i / steps))
+        set_volume(v)
+        time.sleep(duration_s / steps)
+    pause()
+    set_volume(start)  # restore for next play
 
 
 def now_playing():

@@ -184,6 +184,24 @@ async def handle_sleep(_params):
     return {"ok": True}
 
 
+async def handle_play_wake_song(_params):
+    """Play the wake song via Spotify desktop app (AppleScript)."""
+    cfg = STATE["config"] or {}
+    ws = cfg.get("wake_song") or {}
+    uri = ws.get("spotify_uri") or ""
+    if not uri:
+        emit("log", {"msg": "wake_song.spotify_uri empty in config; skipping"})
+        return {"ok": False, "reason": "no_uri"}
+    ok = spotify_ctl.play_uri(uri)
+    return {"ok": bool(ok)}
+
+
+async def handle_stop_wake_song(_params):
+    """Smoothly fade Spotify down so Penelope's greeting is audible."""
+    spotify_ctl.fade_out(duration_s=3.0)
+    return {"ok": True}
+
+
 async def handle_quick_greeting(_params):
     """Quick wake variant ('Hey Penelope'). No song, no brief.
     She just says a short greeting and starts listening."""
@@ -211,6 +229,8 @@ HANDLERS = {
     "start": handle_start,
     "daily_brief": handle_daily_brief,
     "quick_greeting": handle_quick_greeting,
+    "play_wake_song": handle_play_wake_song,
+    "stop_wake_song": handle_stop_wake_song,
     "ask": handle_ask,
     "set_mode": handle_set_mode,
     "reload_config": handle_reload_config,

@@ -10,9 +10,14 @@
 //  12.0s  resolve -> greeting + daily brief begins
 
 export async function runBootSequence({
-  face, panels, song, bootEl, statusEl,
+  face, panels, bootEl, statusEl,
   duration = 12000, quick = false,
 }) {
+  // The wake song (Drake's "Papi's Home") is played by Spotify via the
+  // Python sidecar (AppleScript bridge). This sequence only controls
+  // the visual assembly + panel slide-in. By the time we're called the
+  // song has already been told to start.
+
   if (statusEl) statusEl.textContent = 'awakening';
   bootEl.classList.remove('hidden');
   bootEl.style.opacity = '0';
@@ -26,10 +31,6 @@ export async function runBootSequence({
         ? 'translateX(120%)'
         : 'translateY(120%)';
     p.style.opacity = '0';
-  }
-
-  if (song && song.src) {
-    try { song.volume = 0; await song.play(); fadeIn(song, 1800, 0.8); } catch {}
   }
 
   if (quick) {
@@ -83,15 +84,3 @@ export async function runBootSequence({
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function fadeIn(audio, ms, target) {
-  const start = audio.volume;
-  const t0 = performance.now();
-  const step = () => {
-    const t = (performance.now() - t0) / ms;
-    if (t >= 1) { audio.volume = target; return; }
-    audio.volume = start + (target - start) * t;
-    requestAnimationFrame(step);
-  };
-  step();
-}

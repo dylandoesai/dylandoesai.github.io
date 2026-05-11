@@ -15,6 +15,12 @@
 
   "revenue_milestones": [500, 1000, 2500, 5000, 10000, 25000],
 
+  "wake_song": {
+    "service": "spotify",
+    "spotify_uri": "",
+    "comment": "Right-click the song in Spotify -> Share -> Copy Spotify URI (e.g. spotify:track:5Sl3GKjpKTuFICJsTuS3p2). Pasting the share URL (https://open.spotify.com/track/...) also works."
+  },
+
   "upload_post": {
     "api_key": "",
     "accounts": [
