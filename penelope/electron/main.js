@@ -12,6 +12,9 @@ function createWindow() {
   const display = screen.getPrimaryDisplay();
   const { width, height } = display.workAreaSize;
 
+  // Penelope starts INVISIBLE. The Python sidecar listens for the wake
+  // phrase. On wake, we show + fullscreen the window via showWindow().
+  // On "Sleep Penelope" we hide it again, back to invisible listening.
   mainWindow = new BrowserWindow({
     width,
     height,
@@ -19,9 +22,11 @@ function createWindow() {
     minHeight: 800,
     backgroundColor: '#000000',
     show: false,
-    fullscreen: true,
+    fullscreen: false,
+    skipTaskbar: true,
     autoHideMenuBar: true,
     titleBarStyle: 'hiddenInset',
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -32,7 +37,9 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  // No ready-to-show -> stays invisible until wake.
+
+  if (app.dock) app.dock.hide(); // background-only by default
 
   globalShortcut.register('CommandOrControl+F', () => {
     if (!mainWindow) return;
@@ -40,10 +47,34 @@ function createWindow() {
   });
 }
 
+function showWindow() {
+  if (!mainWindow) return;
+  if (app.dock) app.dock.show();
+  mainWindow.setFullScreen(true);
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function hideWindow() {
+  if (!mainWindow) return;
+  mainWindow.setFullScreen(false);
+  mainWindow.hide();
+  if (app.dock) app.dock.hide();
+}
+
+ipcMain.handle('penelope:showWindow', () => { showWindow(); });
+ipcMain.handle('penelope:hideWindow', () => { hideWindow(); });
+
 function startPython() {
   py = new PythonBridge({
     cwd: path.join(__dirname, '..'),
     onEvent: (evt) => {
+      // Wake events show the window before the renderer hears them
+      if (evt && evt.event === 'hotword') {
+        showWindow();
+      } else if (evt && evt.event === 'go_sleep') {
+        hideWindow();
+      }
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('penelope:event', evt);
       }

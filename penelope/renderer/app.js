@@ -17,7 +17,6 @@ const state = {
   audio: null,
   audioBoot: null,
   speaking: false,
-  briefPlayedToday: false,
   active: false,
 };
 
@@ -85,6 +84,9 @@ function handlePyEvent(evt) {
     case 'hotword':
       handleWake(evt.data);
       break;
+    case 'go_sleep':
+      handleSleep();
+      break;
     case 'user_transcript':
       appendTranscript('user', evt.data.text);
       break;
@@ -102,10 +104,7 @@ function handlePyEvent(evt) {
       state.face.setIdle();
       break;
     case 'face_seen':
-      if (!state.briefPlayedToday) {
-        state.briefPlayedToday = true;
-        handleWake({ first_sight: true });
-      }
+      // Webcam saw owner — no automatic wake (user requested wake-words only).
       break;
     case 'proactive_alert':
       handleAlert(evt.data);
@@ -120,22 +119,22 @@ function handlePyEvent(evt) {
 }
 
 async function handleWake(data) {
-  if (state.active && !data.first_sight) {
-    // already active; quick visual flourish only
-    state.face.bootAssemble(2500);
+  const phrase = data.phrase || 'papis_home';
+  const isFullWake = phrase === 'papis_home';
+
+  if (data.already_active) {
+    // small flourish, no song, no greeting
+    state.face.bootAssemble(1500);
     return;
   }
   state.active = true;
 
-  // Scatter face for the cinematic build
+  // Scatter face for the assembly
   state.face.uniforms.uBootProgress.value = 0;
 
-  // Decide whether to play the song
-  const playSong = !state.briefPlayedToday;
-  state.briefPlayedToday = true;
   const song = $('papis-home-audio');
-  if (playSong) {
-    // The user will supply assets/songs/papis_home.mp3
+  if (isFullWake) {
+    // Play Drake every single time (per spec)
     const songB64 = await window.penelope.readAsset('assets/songs/papis_home.mp3');
     if (songB64) {
       song.src = `data:audio/mpeg;base64,${songB64}`;
@@ -151,13 +150,27 @@ async function handleWake(data) {
   await runBootSequence({
     face: state.face,
     panels,
-    song: playSong ? song : null,
+    song: isFullWake ? song : null,
     bootEl: $('boot-overlay'),
     statusEl: $('status-text'),
+    duration: isFullWake ? 12000 : 2500,
+    quick: !isFullWake,
   });
 
-  // Tell Python to begin the daily brief
-  await window.penelope.call('daily_brief', {});
+  if (isFullWake) {
+    await window.penelope.call('daily_brief', {});
+  } else {
+    await window.penelope.call('quick_greeting', {});
+  }
+}
+
+function handleSleep() {
+  state.active = false;
+  $('status-text').textContent = 'standby';
+  // Re-scatter the face so the next wake is dramatic
+  state.face.uniforms.uBootProgress.value = 0;
+  state.face.setIdle();
+  // Main process hides the window in response to the go_sleep event.
 }
 
 function appendTranscript(who, text) {

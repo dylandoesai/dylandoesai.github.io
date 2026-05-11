@@ -9,7 +9,10 @@
 //  10.5s  face fully assembled, song reaches its hook
 //  12.0s  resolve -> greeting + daily brief begins
 
-export async function runBootSequence({ face, panels, song, bootEl, statusEl }) {
+export async function runBootSequence({
+  face, panels, song, bootEl, statusEl,
+  duration = 12000, quick = false,
+}) {
   if (statusEl) statusEl.textContent = 'awakening';
   bootEl.classList.remove('hidden');
   bootEl.style.opacity = '0';
@@ -25,12 +28,27 @@ export async function runBootSequence({ face, panels, song, bootEl, statusEl }) 
     p.style.opacity = '0';
   }
 
-  // play song (best-effort; missing file is fine)
   if (song && song.src) {
-    try { song.volume = 0; await song.play(); fadeIn(song, 2000, 0.8); } catch {}
+    try { song.volume = 0; await song.play(); fadeIn(song, 1800, 0.8); } catch {}
   }
 
-  // boot text appears
+  if (quick) {
+    // Fast wake (~2.5s): immediate assembly, panels slide in tight, no text shuffle.
+    bootEl.style.opacity = '1';
+    const el = bootEl.querySelector('.boot-text');
+    if (el) el.textContent = 'PENELOPE';
+    const assembly = face.bootAssemble(Math.max(1500, duration - 800));
+    await sleep(200);
+    for (const p of panels) { p.style.transform = ''; p.style.opacity = '1'; }
+    await assembly;
+    bootEl.style.opacity = '0';
+    await sleep(250);
+    bootEl.classList.add('hidden');
+    if (statusEl) statusEl.textContent = 'listening';
+    return;
+  }
+
+  // Full cinematic
   await sleep(1500);
   bootEl.style.opacity = '1';
   const texts = [
@@ -48,23 +66,16 @@ export async function runBootSequence({ face, panels, song, bootEl, statusEl }) 
     if (el) el.textContent = texts[ti] + ' …';
   }, 1400);
 
-  // begin particle assembly at t=3
   await sleep(1500);
-  const assemblyPromise = face.bootAssemble(8000);
+  const assemblyPromise = face.bootAssemble(Math.max(4000, duration - 4000));
 
-  // slide panels in at t=7
   await sleep(4000);
-  for (const p of panels) {
-    p.style.transform = '';
-    p.style.opacity = '1';
-  }
+  for (const p of panels) { p.style.transform = ''; p.style.opacity = '1'; }
 
-  // hide boot text at t=9.5
-  await sleep(2500);
+  await sleep(Math.max(500, duration - 9500));
   clearInterval(textInterval);
   bootEl.style.opacity = '0';
 
-  // wait for assembly to finish (assembly Promise resolves around t=11)
   await assemblyPromise;
   await sleep(400);
   bootEl.classList.add('hidden');

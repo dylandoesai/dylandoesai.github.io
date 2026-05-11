@@ -7,8 +7,17 @@ with a warm Mediterranean voice, listens always, watches via webcam, and
 runs on Claude Opus 4.7 via your Claude Max plan with full Claude Code
 agent capabilities.
 
-> Wake phrase: **"Papi's home"** → plays Drake's *Papi's Home*, assembles
-> Penelope's face from particles, then delivers your daily brief.
+Two wake phrases:
+
+- **"Papi's home"** → fullscreen opens, plays Drake's *Papi's Home* every
+  time, 12-second cinematic particle assembly, then the full daily brief.
+- **"Hey Penelope"** → fullscreen opens with a fast ~2.5-second assembly,
+  no song, no brief. She just answers: *"Yes, dear?" / "Yes, daddy?" /
+  "What can I do for you?"* and starts listening.
+
+Say **"Sleep Penelope"** (or *"Good night Penelope"*) and the window
+hides, the dock icon disappears, and she returns to silent background
+hotword-only mode until you wake her again.
 
 ---
 
@@ -265,7 +274,8 @@ also say:
 - "Penelope, business mode" → professional
 - "Penelope, flirt mode" → flirty
 - "Penelope, normal mode" → warm
-- "Penelope, sleep" / "Good night Penelope" → back to standby
+- "Sleep Penelope" / "Good night Penelope" → hide window, back to
+  hotword-only standby
 
 ## Capabilities
 

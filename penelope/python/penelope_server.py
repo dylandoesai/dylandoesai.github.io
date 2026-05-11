@@ -103,13 +103,20 @@ async def handle_start(_params):
 
 
 def on_hotword(phrase: str):
-    """Called from the hotword thread when 'Papi's home' is detected."""
+    """Called from the hotword thread.
+
+    phrase = 'papis_home'   -> full activation: song + assembly + brief
+    phrase = 'hey_penelope' -> quick wake: fast assembly + short greeting
+    """
     if STATE["active"]:
+        # Already awake; still acknowledge so the renderer can show a
+        # gentle flourish. Don't re-run the full sequence.
+        emit("hotword", {"phrase": phrase, "already_active": True})
         return
     STATE["active"] = True
-    emit("hotword", {"phrase": phrase})
-    # Renderer will then call back into us with daily_brief() after the
-    # 12-second cinematic boot sequence.
+    emit("hotword", {"phrase": phrase, "already_active": False})
+    # Renderer drives the boot sequence, then calls daily_brief()
+    # (papis_home) or quick_greeting (hey_penelope).
 
 
 async def handle_daily_brief(_params):
@@ -173,6 +180,25 @@ async def handle_reload_config(_params):
 
 async def handle_sleep(_params):
     STATE["active"] = False
+    emit("go_sleep", {})
+    return {"ok": True}
+
+
+async def handle_quick_greeting(_params):
+    """Quick wake variant ('Hey Penelope'). No song, no brief.
+    She just says a short greeting and starts listening."""
+    import random
+    cfg = STATE["config"] or {}
+    mode = STATE["mode"]
+    if mode == "professional":
+        lines = ["Yes, Papi?", "Yes Dylan?", "What do you need?",
+                 "I'm here, what's up?"]
+    else:
+        lines = ["Yes, dear?", "Yes, daddy?", "What can I do for you?",
+                 "I'm right here, mi amor.", "Hi, Papi. What is it?"]
+    text = random.choice(lines)
+    await speak(text)
+    asyncio.create_task(start_listening_loop())
     return {"ok": True}
 
 
@@ -184,6 +210,7 @@ async def handle_shutdown(_params):
 HANDLERS = {
     "start": handle_start,
     "daily_brief": handle_daily_brief,
+    "quick_greeting": handle_quick_greeting,
     "ask": handle_ask,
     "set_mode": handle_set_mode,
     "reload_config": handle_reload_config,
@@ -227,11 +254,13 @@ async def start_listening_loop():
         transcripts.append("dylan", text)
         emit("user_transcript", {"text": text})
 
-        # Detect mode-switch commands
+        # Detect mode-switch + sleep commands
         low = text.lower()
-        if "penelope sleep" in low or "good night penelope" in low:
+        if any(p in low for p in ("sleep penelope", "penelope sleep",
+                                   "good night penelope", "goodnight penelope")):
             await speak("Sleeping, Papi. Just say my name and I'm right here.")
             STATE["active"] = False
+            emit("go_sleep", {})
             break
         if "professional mode" in low or "business mode" in low:
             STATE["mode"] = "professional"
