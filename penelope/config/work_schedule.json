@@ -32,12 +32,16 @@
   },
 
   "_pattern_comment": [
-    "Crew D's 28-day O-I Kalama rotation:",
-    "  3D - 2off - 2D - 3off - 2N - 2off - 3N - 2off - 2N - 7off",
+    "Crew D's 28-day O-I Kalama rotation, viewed as 4 weeks:",
+    "  Week 1:  3D  2off  2D    (Fri-Thu starting from anchor)",
+    "  Week 2:  3off  2N  2off",
+    "  Week 3:  3N  2off  2N",
+    "  Week 4:  3off  2D  2off",
     "Anchored to 2026-01-02 (the first day of cycle 1 in the printed",
-    "schedule). Shift_state rolls this forward to today via",
+    "schedule). shift_state rolls forward via",
     "  cycle_day = (date - anchor) mod 28",
-    "and reads the letter at that index of 'sequence'."
+    "and reads the letter at that index of 'sequence'.",
+    "14 work days per 28-day cycle (7 day shifts, 7 night shifts)."
   ],
   "pattern": {
     "anchor_date": "2026-01-02",
@@ -45,7 +49,7 @@
       "D", "D", "D", "O", "O", "D", "D",
       "O", "O", "O", "N", "N", "O", "O",
       "N", "N", "N", "O", "O", "N", "N",
-      "O", "O", "O", "O", "O", "O", "O"
+      "O", "O", "O", "D", "D", "O", "O"
     ]
   },
 
