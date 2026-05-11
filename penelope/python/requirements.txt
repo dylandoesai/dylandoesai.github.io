@@ -17,6 +17,9 @@
 #   - keychain:          keyring (macOS Keychain for the Fernet key)
 #   - misc:              python-dateutil
 
+# face_recognition_models still imports pkg_resources, removed in setuptools 81.
+# Pin here so a clean setup gets a working install.
+setuptools<81
 pvporcupine>=3.0
 webrtcvad>=2.0.10
 sounddevice>=0.4.6
