@@ -1,0 +1,47 @@
+{
+  "name": "penelope",
+  "version": "0.1.0",
+  "description": "Penelope — cyber personal AI assistant with a 3D particle face",
+  "main": "electron/main.js",
+  "author": "Papi",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder --mac --arm64 --x64"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.papi.penelope",
+    "productName": "Penelope",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg"],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Penelope listens for your voice.",
+        "NSSpeechRecognitionUsageDescription": "Penelope transcribes your voice locally."
+      }
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "config/**/*",
+      "python/**/*",
+      "!python/__pycache__",
+      "!.venv"
+    ],
+    "extraResources": [
+      { "from": ".venv", "to": "python_venv" }
+    ]
+  }
+}

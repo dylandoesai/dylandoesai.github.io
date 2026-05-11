@@ -1,0 +1,10 @@
+{
+  "items": [
+    { "text": "Drop Penelope reference photos in assets/reference/", "done": false, "priority": "high" },
+    { "text": "Run python python/extract_face_mesh.py assets/reference/*.jpg", "done": false, "priority": "high" },
+    { "text": "Drop papis_home.mp3 in assets/songs/", "done": false, "priority": "high" },
+    { "text": "Fill in upload-post API key in config/config.json", "done": false, "priority": "med" },
+    { "text": "Add Stripe / Gumroad / AdSense credentials", "done": false, "priority": "med" },
+    { "text": "Grant Calendar + Reminders + Microphone + Camera permissions", "done": false, "priority": "high" }
+  ]
+}

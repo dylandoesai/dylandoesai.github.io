@@ -1,0 +1,34 @@
+# Penelope Python sidecar dependencies.
+#
+# Install:   python3.11 -m venv .venv && source .venv/bin/activate
+#            pip install -r python/requirements.txt
+#
+# All deps listed here are required for the v1 feature set:
+#   - hotword:           pvporcupine (Porcupine, free key from picovoice.ai)
+#                        Whisper fallback uses faster-whisper.
+#   - VAD:               webrtcvad
+#   - mic capture:       sounddevice + numpy
+#   - STT:               faster-whisper (CTranslate2-backed, fast on Apple Silicon)
+#   - TTS:               edge-tts (free, no API key)
+#   - face geometry:     mediapipe + opencv-python  (for extract_face_mesh.py)
+#   - face recognition:  face_recognition (dlib-based, train from photos)
+#   - integrations:      requests, stripe
+#   - encryption:        cryptography (Fernet for transcript encryption)
+#   - keychain:          keyring (macOS Keychain for the Fernet key)
+#   - misc:              python-dateutil
+
+pvporcupine>=3.0
+webrtcvad>=2.0.10
+sounddevice>=0.4.6
+numpy>=1.26
+faster-whisper>=1.0.0
+edge-tts>=6.1.10
+mediapipe>=0.10.9
+opencv-python>=4.9
+face_recognition>=1.3.0
+requests>=2.31
+stripe>=8.0
+cryptography>=42.0
+keyring>=24.3
+python-dateutil>=2.8
+pillow>=10.2

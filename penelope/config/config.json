@@ -1,0 +1,46 @@
+{
+  "name": "Dylan",
+  "pet_name": "Papi",
+
+  "tts_voice": "helena",
+  "tts_rate": "-8%",
+  "tts_pitch": "-2Hz",
+  "tts_audition_on_first_launch": true,
+
+  "stt_model": "base.en",
+
+  "picovoice_access_key": "",
+
+  "weather_location": null,
+
+  "revenue_milestones": [500, 1000, 2500, 5000, 10000, 25000],
+
+  "upload_post": {
+    "api_key": "",
+    "accounts": [
+      { "nickname": "channel-1", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-2", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-3", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-4", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-5", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-6", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
+      { "nickname": "channel-7", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] }
+    ]
+  },
+
+  "stripe": { "api_key": "" },
+  "gumroad": { "access_token": "" },
+  "adsense": { "oauth_token": "", "account_id": "" },
+
+  "home_assistant": { "base_url": "", "token": "" },
+  "slack": { "user_token": "" },
+
+  "modes": {
+    "default": "warm",
+    "rules": {
+      "professional_when_calendar_keywords": ["meeting", "call", "interview", "podcast"],
+      "flirty_after_hour": 22,
+      "professional_if_other_face_present": true
+    }
+  }
+}

@@ -1,0 +1,86 @@
+// 12-second cinematic boot sequence.
+//
+// Timeline:
+//   0.0s  panels invisible, face fully scattered, song fades in
+//   1.5s  boot text "INITIALIZING PENELOPE..." fades in
+//   3.0s  particles begin assembling (face.bootAssemble drives this)
+//   7.0s  panels begin sliding in from edges
+//   9.5s  boot text fades out
+//  10.5s  face fully assembled, song reaches its hook
+//  12.0s  resolve -> greeting + daily brief begins
+
+export async function runBootSequence({ face, panels, song, bootEl, statusEl }) {
+  if (statusEl) statusEl.textContent = 'awakening';
+  bootEl.classList.remove('hidden');
+  bootEl.style.opacity = '0';
+
+  // hide panels
+  for (const p of panels) {
+    p.style.transition = 'transform 1.2s ease, opacity 1.2s ease';
+    p.style.transform = p.id.includes('left')
+      ? 'translateX(-120%)'
+      : p.id.includes('right')
+        ? 'translateX(120%)'
+        : 'translateY(120%)';
+    p.style.opacity = '0';
+  }
+
+  // play song (best-effort; missing file is fine)
+  if (song && song.src) {
+    try { song.volume = 0; await song.play(); fadeIn(song, 2000, 0.8); } catch {}
+  }
+
+  // boot text appears
+  await sleep(1500);
+  bootEl.style.opacity = '1';
+  const texts = [
+    'INITIALIZING PENELOPE',
+    'LOADING NEURAL CORE',
+    'SYNCING FACE GEOMETRY',
+    'CONNECTING TO CLAUDE',
+    'PULLING ANALYTICS',
+    'WELCOME HOME, PAPI',
+  ];
+  let ti = 0;
+  const textInterval = setInterval(() => {
+    ti = (ti + 1) % texts.length;
+    const el = bootEl.querySelector('.boot-text');
+    if (el) el.textContent = texts[ti] + ' …';
+  }, 1400);
+
+  // begin particle assembly at t=3
+  await sleep(1500);
+  const assemblyPromise = face.bootAssemble(8000);
+
+  // slide panels in at t=7
+  await sleep(4000);
+  for (const p of panels) {
+    p.style.transform = '';
+    p.style.opacity = '1';
+  }
+
+  // hide boot text at t=9.5
+  await sleep(2500);
+  clearInterval(textInterval);
+  bootEl.style.opacity = '0';
+
+  // wait for assembly to finish (assembly Promise resolves around t=11)
+  await assemblyPromise;
+  await sleep(400);
+  bootEl.classList.add('hidden');
+  if (statusEl) statusEl.textContent = 'online';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function fadeIn(audio, ms, target) {
+  const start = audio.volume;
+  const t0 = performance.now();
+  const step = () => {
+    const t = (performance.now() - t0) / ms;
+    if (t >= 1) { audio.volume = target; return; }
+    audio.volume = start + (target - start) * t;
+    requestAnimationFrame(step);
+  };
+  step();
+}

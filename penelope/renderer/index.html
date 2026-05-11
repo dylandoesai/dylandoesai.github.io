@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file: data: blob:; img-src 'self' data: blob:;" />
+  <title>Penelope</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="grid-overlay" aria-hidden="true"></div>
+
+  <main id="stage">
+    <canvas id="face-canvas"></canvas>
+
+    <header id="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span class="name">PENELOPE</span>
+        <span class="sub" id="status-text">standby</span>
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+    </header>
+
+    <aside id="left-panel" class="panel">
+      <section class="card" id="revenue-card">
+        <h2>Revenue</h2>
+        <div class="big" id="revenue-total">$0</div>
+        <canvas id="revenue-chart" width="320" height="120"></canvas>
+        <ul class="kv" id="revenue-list"></ul>
+      </section>
+      <section class="card" id="todo-card">
+        <h2>Today</h2>
+        <ul id="todo-list"></ul>
+      </section>
+    </aside>
+
+    <aside id="right-panel" class="panel">
+      <section class="card" id="yt-card">
+        <h2>YouTube</h2>
+        <div class="row" id="yt-stats"></div>
+        <canvas id="yt-chart" width="320" height="100"></canvas>
+        <ul class="kv" id="yt-top"></ul>
+      </section>
+      <section class="card" id="tt-card">
+        <h2>TikTok</h2>
+        <div class="row" id="tt-stats"></div>
+        <canvas id="tt-chart" width="320" height="100"></canvas>
+        <ul class="kv" id="tt-top"></ul>
+      </section>
+    </aside>
+
+    <footer id="bottom-panel">
+      <section class="card" id="schedule-card">
+        <h2>Schedule</h2>
+        <ul id="schedule-list"></ul>
+      </section>
+      <section class="card" id="weather-card">
+        <h2>Weather</h2>
+        <div id="weather-now"></div>
+      </section>
+      <section class="card" id="transcript-card">
+        <h2>Conversation</h2>
+        <div id="transcript"></div>
+      </section>
+    </footer>
+
+    <div id="boot-overlay" class="hidden">
+      <div class="boot-text" id="boot-text">INITIALIZING…</div>
+    </div>
+  </main>
+
+  <audio id="papis-home-audio" preload="auto"></audio>
+  <audio id="tts-audio" preload="auto"></audio>
+
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

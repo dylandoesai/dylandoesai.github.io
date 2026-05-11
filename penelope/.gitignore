@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+assets/songs/*.mp3
+assets/songs/*.m4a
+assets/*.ppn
+.env

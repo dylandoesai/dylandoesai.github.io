@@ -1,0 +1,11 @@
+{
+  "channels": [
+    { "id": 1, "name": "channel-1", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 2, "name": "channel-2", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 3, "name": "channel-3", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 4, "name": "channel-4", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 5, "name": "channel-5", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 6, "name": "channel-6", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
+    { "id": 7, "name": "channel-7", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } }
+  ]
+}
