@@ -106,8 +106,12 @@ def _shape_for_panels(results: list) -> dict:
     for r in results:
         p = r["platform"]; d = r.get("data") or {}
         out[p]["channels"].append({
+            # canonical brand name (= YouTube channel name) -- always
+            # the same across platform buckets for the same channel
             "name": r["channel"],
-            "handle": r["handle"],
+            # the actual @handle on THIS platform (may differ across
+            # platforms for the same brand)
+            "platform_handle": r["handle"],
             "subs": d.get("followers", d.get("subscribers", 0)),
             "views_today": d.get("views_24h", 0),
             "views_28d": d.get("views_28d", 0),

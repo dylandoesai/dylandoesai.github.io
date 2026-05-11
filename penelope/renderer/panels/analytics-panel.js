@@ -32,7 +32,10 @@ function renderPlatform(prefix, p) {
   drawBars(document.getElementById(`${prefix}-chart`),
            p.series_views || []);
 
-  // Top performers across channels
+  // Top performers across channels.
+  // Each row shows the canonical brand name (= YouTube channel name)
+  // alongside the post title; the per-platform handle isn't repeated
+  // because the parent card already says which platform we're on.
   const top = document.getElementById(`${prefix}-top`);
   top.innerHTML = '';
   const all = [];
@@ -40,7 +43,9 @@ function renderPlatform(prefix, p) {
   all.sort((a, b) => (b.views || 0) - (a.views || 0));
   for (const v of all.slice(0, 4)) {
     const el = document.createElement('li');
-    el.innerHTML = `<span>${truncate(v.title || '', 24)}</span><b>${fmt(v.views || 0)}</b>`;
+    const label = v.ch ? `${v.ch} · ${truncate(v.title || '', 18)}`
+                       : truncate(v.title || '', 24);
+    el.innerHTML = `<span>${label}</span><b>${fmt(v.views || 0)}</b>`;
     top.appendChild(el);
   }
 }
