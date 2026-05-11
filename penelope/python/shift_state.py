@@ -34,20 +34,26 @@ def _hhmm(s: str) -> dt.time:
 
 
 def letter_for_date(cfg: dict, date: dt.date) -> str | None:
+    """Letter for crew D on the given date. Calendar overrides win;
+    otherwise we fall through to the 28-day pattern."""
     ws = cfg.get("work_schedule") or _load_ws()
     mode = ws.get("mode") or "pattern"
 
+    # Calendar mode (or one-off override list in pattern mode): explicit
+    # entries always win over the pattern.
+    for entry in (ws.get("days") or []):
+        if not isinstance(entry, dict):
+            continue
+        try:
+            d = dt.date.fromisoformat(entry["date"])
+        except (KeyError, ValueError):
+            continue
+        if d == date:
+            return (entry.get("shift") or "O")[0].upper()
     if mode == "calendar":
-        for entry in (ws.get("days") or []):
-            try:
-                d = dt.date.fromisoformat(entry["date"])
-            except (KeyError, ValueError):
-                continue
-            if d == date:
-                return (entry.get("shift") or "O")[0].upper()
-        return None
+        return None  # calendar-only mode and no entry => off by default
 
-    # pattern mode
+    # Pattern mode
     p = ws.get("pattern") or {}
     seq = p.get("sequence") or []
     anchor = p.get("anchor_date") or ""

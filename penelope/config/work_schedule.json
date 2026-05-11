@@ -23,7 +23,7 @@
     "by adding 'start' and 'end' fields (HH:MM, 24h)."
   ],
 
-  "mode": "calendar",
+  "mode": "pattern",
   "crew": "D",
   "plant": "O-I Kalama",
   "shift_times": {
@@ -31,11 +31,24 @@
     "night": { "start": "19:00", "end": "07:00" }
   },
 
+  "_pattern_comment": [
+    "Crew D's 28-day O-I Kalama rotation:",
+    "  3D - 2off - 2D - 3off - 2N - 2off - 3N - 2off - 2N - 7off",
+    "Anchored to 2026-01-02 (the first day of cycle 1 in the printed",
+    "schedule). Shift_state rolls this forward to today via",
+    "  cycle_day = (date - anchor) mod 28",
+    "and reads the letter at that index of 'sequence'."
+  ],
   "pattern": {
-    "anchor_date": "",
-    "sequence": []
+    "anchor_date": "2026-01-02",
+    "sequence": [
+      "D", "D", "D", "O", "O", "D", "D",
+      "O", "O", "O", "N", "N", "O", "O",
+      "N", "N", "N", "O", "O", "N", "N",
+      "O", "O", "O", "O", "O", "O", "O"
+    ]
   },
 
-  "_days_comment": "2026 schedule (crew D) below; one entry per shift day. Shape: {\"date\": \"2026-01-02\", \"shift\": \"D\"} (D = day, N = night). Days not listed = days off.",
+  "_days_comment": "Calendar mode override list. Empty when using pattern mode. If a date appears here it wins over the pattern (good for one-off swaps).",
   "days": []
 }
