@@ -15,8 +15,16 @@ assets/*.ppn
 # is safe to commit.
 assets/reference/
 
+# Owner-identity photos used by face_recognition. Personal data.
+assets/owner_faces/
+
 # Auto-downloaded MediaPipe model (~3.6MB); extract_face_mesh.py re-fetches.
 python/models/
 
 # Vendored by scripts/setup.sh from node_modules/three.
 renderer/vendor/
+
+# Local secrets + personal financial data — never push to the public
+# dylandoesai.github.io remote.
+config/config.json
+config/revenue.json

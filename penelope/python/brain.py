@@ -30,6 +30,7 @@ from pathlib import Path
 import config_loader
 import transcripts
 from integrations import upload_post, stripe_src, gumroad_src, adsense_src
+from integrations import elevenlabs_src
 
 
 CLAUDE_BIN = shutil.which("claude") or "claude"
@@ -95,7 +96,8 @@ async def gather_revenue() -> dict:
 
     for src_name, src in [("Stripe",  stripe_src),
                           ("Gumroad", gumroad_src),
-                          ("AdSense", adsense_src)]:
+                          ("AdSense", adsense_src),
+                          ("ElevenLabs", elevenlabs_src)]:
         try:
             data = await src.fetch(cfg) if hasattr(src, "fetch") else None
         except Exception:

@@ -42,6 +42,15 @@ cp node_modules/three/build/three.module.js renderer/vendor/three.module.js
 # Required directories
 mkdir -p assets/reference assets/owner_faces assets/songs
 
+# Local config (gitignored). Seed from the example template on first run
+# so the app has something to read; the user fills in real keys after.
+for c in config/config.json config/revenue.json; do
+  if [ ! -f "$c" ] && [ -f "${c%.json}.example.json" ]; then
+    cp "${c%.json}.example.json" "$c"
+    echo "==> seeded $c from $(basename "${c%.json}.example.json")"
+  fi
+done
+
 # Suggest the user log into claude
 if command -v claude >/dev/null 2>&1; then
   if ! claude --version >/dev/null 2>&1; then
