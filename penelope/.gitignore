@@ -9,3 +9,14 @@ assets/songs/*.mp3
 assets/songs/*.m4a
 assets/*.ppn
 .env
+
+# Reference photos are personal-use only — README forbids redistribution.
+# Drop them locally in assets/reference/; only the extracted face-mesh.json
+# is safe to commit.
+assets/reference/
+
+# Auto-downloaded MediaPipe model (~3.6MB); extract_face_mesh.py re-fetches.
+python/models/
+
+# Vendored by scripts/setup.sh from node_modules/three.
+renderer/vendor/
