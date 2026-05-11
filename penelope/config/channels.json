@@ -1,11 +1,90 @@
 {
+  "_comment": [
+    "7 channels, each with 5 platforms. Per-platform: 'handle' is your",
+    "public @ on that platform (purely informational, used in greetings/",
+    "logs). 'upload_post_nickname' is the nickname you gave that specific",
+    "platform account in your upload-post.com dashboard -- this is what",
+    "the upload-post API uses to fetch analytics for that account.",
+    "",
+    "Handles + nicknames can differ per channel and per platform. If a",
+    "channel doesn't exist on a platform, leave that platform empty.",
+    "",
+    "Examples:",
+    "  youtube.handle               = @dylancyber",
+    "  youtube.upload_post_nickname = cyber-yt",
+    "  tiktok.handle                = @dylan_cyber",
+    "  tiktok.upload_post_nickname  = cyber-tt"
+  ],
   "channels": [
-    { "id": 1, "name": "channel-1", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 2, "name": "channel-2", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 3, "name": "channel-3", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 4, "name": "channel-4", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 5, "name": "channel-5", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 6, "name": "channel-6", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } },
-    { "id": 7, "name": "channel-7", "handles": { "youtube": "", "tiktok": "", "instagram": "", "facebook": "", "x": "" } }
+    {
+      "id": 1, "name": "channel-1",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 2, "name": "channel-2",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 3, "name": "channel-3",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 4, "name": "channel-4",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 5, "name": "channel-5",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 6, "name": "channel-6",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    },
+    {
+      "id": 7, "name": "channel-7",
+      "platforms": {
+        "youtube":   { "handle": "", "upload_post_nickname": "" },
+        "tiktok":    { "handle": "", "upload_post_nickname": "" },
+        "instagram": { "handle": "", "upload_post_nickname": "" },
+        "facebook":  { "handle": "", "upload_post_nickname": "" },
+        "x":         { "handle": "", "upload_post_nickname": "" }
+      }
+    }
   ]
 }

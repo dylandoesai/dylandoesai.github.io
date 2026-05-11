@@ -23,15 +23,7 @@
 
   "upload_post": {
     "api_key": "",
-    "accounts": [
-      { "nickname": "channel-1", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-2", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-3", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-4", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-5", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-6", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] },
-      { "nickname": "channel-7", "platforms": ["youtube", "tiktok", "instagram", "facebook", "x"] }
-    ]
+    "_comment": "Channel/platform/nickname mapping lives in config/channels.json"
   },
 
   "stripe": { "api_key": "" },
