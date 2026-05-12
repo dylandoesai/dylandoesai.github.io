@@ -340,7 +340,10 @@ async def handle_get_panel_data(_params):
     rev_task = asyncio.create_task(brain.gather_revenue())
     an_task = asyncio.create_task(brain.gather_analytics())
     cal_task = loop.run_in_executor(None, apple_cal.today_events)
-    rem_task = loop.run_in_executor(None, apple_reminders.scheduled_today)
+    # Show upcoming reminders (next 7 days), not just today — many of
+    # Dylan's reminders are scheduled days/weeks out, so "today only"
+    # almost always renders empty.
+    rem_task = loop.run_in_executor(None, lambda: apple_reminders.upcoming(7))
     cfg_for_wx = STATE.get("config") or config_loader.load()
     wx_task = asyncio.create_task(weather.current(cfg_for_wx.get("weather_location")))
     rev = await rev_task
@@ -363,8 +366,19 @@ async def handle_get_panel_data(_params):
          "where": e.get("where", "")}
         for e in cal_events
     ]}
+    def _fmt_due(due_key: str) -> str:
+        # "202605170500" → "May 17"
+        if not due_key or len(due_key) < 8:
+            return ""
+        try:
+            import time as _t
+            dt = _t.strptime(due_key[:8], "%Y%m%d")
+            return _t.strftime("%b %-d", dt).upper()
+        except Exception:
+            return ""
     todos = {"items": [
-        {"text": r.get("title", ""), "done": False, "priority": "med"}
+        {"text": r.get("title", ""), "when": _fmt_due(r.get("due_key", "")),
+         "done": False, "priority": "med"}
         for r in reminders
     ]}
     return {
@@ -473,16 +487,22 @@ async def speak(text: str):
 
 async def start_listening_loop():
     """Always-on VAD loop after activation. Cancellable on barge-in."""
+    _log_file("start_listening_loop entered (active={})".format(STATE.get("active")))
     while STATE["active"]:
         emit("assistant_idle", {})
+        _log_file("listening_loop: waiting for next utterance via VAD")
         # Block on VAD for the next utterance
         wav = await vad_listener.next_utterance(STATE)
         if not STATE["active"]:
+            _log_file("listening_loop: state inactive, breaking")
             break
         if wav is None:
+            _log_file("listening_loop: vad returned None, looping")
             continue
+        _log_file(f"listening_loop: got utterance, {len(wav)} samples")
         # Transcribe
         text = await stt.transcribe(wav)
+        _log_file(f"listening_loop: transcribed: {text!r}")
         if not text or len(text.strip()) < 2:
             continue
         transcripts.append("dylan", text)
