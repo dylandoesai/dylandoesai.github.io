@@ -27,8 +27,14 @@
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Penelope listens for your voice.",
-        "NSSpeechRecognitionUsageDescription": "Penelope transcribes your voice locally."
+        "NSMicrophoneUsageDescription": "Penelope listens for your wake words and conversations.",
+        "NSCameraUsageDescription": "Penelope uses your camera for face recognition so she only responds to you.",
+        "NSSpeechRecognitionUsageDescription": "Penelope transcribes your voice locally via Whisper.",
+        "NSCalendarsUsageDescription": "Penelope reads your Apple Calendar to brief you on the day and writes your O-I Kalama shifts.",
+        "NSRemindersUsageDescription": "Penelope reads and creates Apple Reminders for you.",
+        "NSAppleEventsUsageDescription": "Penelope controls Spotify, Apple Mail, and other Mac apps via AppleScript.",
+        "NSContactsUsageDescription": "Penelope reads contacts for iMessage and phone-call routing.",
+        "LSUIElement": false
       }
     },
     "files": [
@@ -37,8 +43,15 @@
       "assets/**/*",
       "config/**/*",
       "python/**/*",
+      "CLAUDE.md",
       "!python/__pycache__",
       "!.venv"
+    ],
+    "asarUnpack": [
+      "python/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "CLAUDE.md"
     ],
     "extraResources": [
       { "from": ".venv", "to": "python_venv" }

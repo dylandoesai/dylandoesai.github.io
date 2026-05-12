@@ -37,12 +37,37 @@ class PythonBridge {
     return 'python3';
   }
 
+  resolveScript() {
+    // Packaged app FIRST — its app.asar.unpacked is the runnable copy.
+    // (fs.existsSync returns true for paths inside app.asar too, so we
+    // must check the unpacked path first or we silently end up trying
+    // to spawn a script that lives inside the asar archive.)
+    if (process.resourcesPath) {
+      const u = path.join(process.resourcesPath, 'app.asar.unpacked',
+                          'python', 'penelope_server.py');
+      if (fs.existsSync(u)) return u;
+    }
+    // Dev mode
+    return path.join(this.cwd, 'python', 'penelope_server.py');
+  }
+
+  resolveCwd() {
+    if (process.resourcesPath) {
+      const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked');
+      if (fs.existsSync(path.join(unpacked, 'python', 'penelope_server.py'))) {
+        return unpacked;
+      }
+    }
+    return this.cwd;
+  }
+
   start() {
     const py = this.resolvePython();
-    const script = path.join(this.cwd, 'python', 'penelope_server.py');
-    this.onLog(`spawning ${py} ${script}`);
+    const script = this.resolveScript();
+    const cwd = this.resolveCwd();
+    this.onLog(`spawning ${py} ${script} (cwd=${cwd})`);
     this.proc = spawn(py, ['-u', script], {
-      cwd: this.cwd,
+      cwd,
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });

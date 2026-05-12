@@ -116,15 +116,27 @@ ipcMain.handle('penelope:call', async (_evt, method, params) => {
   return py.call(method, params);
 });
 
+// In packaged app, config/ and assets/ live next to app.asar (unpacked).
+// Resolve from there if present; fall back to dev path.
+function resolveProjectFile(rel) {
+  if (process.resourcesPath) {
+    const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', rel);
+    if (fs.existsSync(unpacked)) return unpacked;
+  }
+  const dev = path.join(__dirname, '..', rel);
+  return fs.existsSync(dev) ? dev : null;
+}
+
 ipcMain.handle('penelope:readConfig', async (_evt, name) => {
-  const p = path.join(__dirname, '..', 'config', name);
-  if (!fs.existsSync(p)) return null;
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
+  const p = resolveProjectFile(path.join('config', name));
+  if (!p) return null;
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+  catch { return null; }
 });
 
 ipcMain.handle('penelope:readAsset', async (_evt, rel) => {
-  const p = path.join(__dirname, '..', rel);
-  if (!fs.existsSync(p)) return null;
+  const p = resolveProjectFile(rel);
+  if (!p) return null;
   return fs.readFileSync(p).toString('base64');
 });
 
