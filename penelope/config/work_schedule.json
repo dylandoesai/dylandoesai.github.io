@@ -27,8 +27,16 @@
   "crew": "D",
   "plant": "O-I Kalama",
   "shift_times": {
-    "day":   { "start": "07:00", "end": "19:00" },
-    "night": { "start": "19:00", "end": "07:00" }
+    "day":   { "start": "06:45", "end": "18:45" },
+    "night": { "start": "18:45", "end": "06:45" }
+  },
+
+  "_routine_comment": "Dylan wakes at 05:00 for day shifts / 17:00 for nights, leaves the house 05:15-05:30 AM/PM depending on direction. Penelope uses these for pre-shift greetings + wake-up nudges.",
+  "routine": {
+    "wake_for_day":    "05:00",
+    "leave_for_day":   "05:25",
+    "wake_for_night":  "17:00",
+    "leave_for_night": "17:25"
   },
 
   "_pattern_comment": [

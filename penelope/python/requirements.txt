@@ -35,3 +35,6 @@ cryptography>=42.0
 keyring>=24.3
 python-dateutil>=2.8
 pillow>=10.2
+
+# EventKit for native Reminders read — AppleScript times out on huge lists.
+pyobjc-framework-EventKit>=10.0
