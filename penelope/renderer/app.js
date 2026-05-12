@@ -4,7 +4,6 @@
 // every platform's subs + 28d views.
 
 import { PenelopeFace } from './visualizer/penelope-face.js';
-import { loadFaceLandmarks } from './visualizer/face-landmarks.js';
 import { AudioAnalyzer } from './visualizer/audio-analyzer.js';
 import { runBootSequence } from './visualizer/boot-sequence.js';
 
@@ -31,9 +30,7 @@ const DASHBOARDS = {
 async function boot() {
   state.cfg = (await window.penelope.readConfig('config.json')) || {};
 
-  // 3D face — same particle visualizer, less density now
-  const lm = await loadFaceLandmarks();
-  console.log(`face mesh: ${lm.source} (${lm.count} points)`);
+  // 3D face — texture-driven particle stippling from her actual photo.
   state.face = new PenelopeFace($('face-canvas'));
   state.face.start();
   state.face.uniforms.uBootProgress.value = 1;
