@@ -79,6 +79,7 @@ from integrations import (
     homekit,
     imessage,
     phone,
+    screen_share,
     slack_src,
     spotify_ctl,
     stremio,
@@ -249,6 +250,30 @@ def stremio_launch() -> dict:
 def stremio_play(url_or_imdb_id: str) -> dict:
     """Play in Stremio. Accepts stremio:// URL or IMDB id like tt1234567."""
     return {"ok": stremio.play(url_or_imdb_id)}
+
+
+# ---------- Screen share / AirPlay ----------
+
+@mcp.tool()
+def screen_share_list_receivers() -> list:
+    """List AirPlay receivers discoverable on the LAN (Apple TVs, modern
+    Roku TVs, etc.). Firestick/Chromecast won't show up unless they have
+    an AirPlay receiver app installed."""
+    return screen_share.list_receivers()
+
+
+@mcp.tool()
+def screen_share_mirror_to(name_fragment: str) -> dict:
+    """Start mirroring Dylan's Mac screen to the named receiver.
+    Tries `Penelope: mirror to <name>` Shortcut first, falls back to
+    Control Center accessibility automation."""
+    return screen_share.mirror_to(name_fragment)
+
+
+@mcp.tool()
+def screen_share_stop() -> dict:
+    """Stop active screen mirroring."""
+    return screen_share.stop_mirroring()
 
 
 # ---------- Smart home ----------
