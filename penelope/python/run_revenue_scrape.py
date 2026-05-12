@@ -1,17 +1,23 @@
-"""Thin entry point so the scraper is a one-liner from anywhere:
+"""Entry point for the daily revenue scrape.
 
-    python python/run_revenue_scrape.py
+Currently scrapes:
+  - ElevenLabs voice-library financial rewards (chart → SVG path → USD)
 
-Forwards all args to integrations/revenue_scraper.main.
+Use:  bash scripts/scrape-revenue.sh
 """
 
+import asyncio
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from integrations.revenue_scraper import main  # noqa: E402
+from integrations.elevenlabs_dashboard_scraper import main as elevenlabs_main  # noqa: E402
+
+
+async def main():
+    await elevenlabs_main()
+
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
