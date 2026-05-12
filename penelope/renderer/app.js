@@ -116,6 +116,9 @@ async function boot() {
     cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500);
   });
 
+  // Wire the modular drag/resize layout
+  wireLayout();
+
   // Wire the invisible compose dock (text channel)
   wireCompose();
 
@@ -351,6 +354,130 @@ function tickClock() {
   const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
   $('clock').textContent = `${hh}:${mm}:${ss} ${ampm}`;
 }
+
+// ─── Modular floating-card layout ──
+// Every .card can be dragged by its <h2> header to anywhere on screen,
+// resized by the SE corner grip, and its position+size persists across
+// runs in localStorage. Multiple panels can sit on one screen.
+// Reset layout button in the topbar wipes the saved state.
+
+const LAYOUT_KEY = 'penelope.layout.v1';
+
+function loadLayoutMap() {
+  try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveLayoutMap(m) { localStorage.setItem(LAYOUT_KEY, JSON.stringify(m)); }
+
+function liftCardToFloating(card) {
+  if (card.classList.contains('floating')) return;
+  const r = card.getBoundingClientRect();
+  card.classList.add('floating');
+  card.style.left = r.left + 'px';
+  card.style.top = r.top + 'px';
+  card.style.width = r.width + 'px';
+  card.style.height = r.height + 'px';
+}
+
+function restoreLayout() {
+  const map = loadLayoutMap();
+  for (const card of document.querySelectorAll('.card')) {
+    const id = card.id;
+    if (!id || !map[id]) continue;
+    const s = map[id];
+    card.classList.add('floating');
+    card.style.left = s.left + 'px';
+    card.style.top = s.top + 'px';
+    card.style.width = s.width + 'px';
+    card.style.height = s.height + 'px';
+  }
+}
+
+function persistCard(card) {
+  if (!card.id) return;
+  const r = card.getBoundingClientRect();
+  const map = loadLayoutMap();
+  map[card.id] = {
+    left: r.left | 0, top: r.top | 0,
+    width: r.width | 0, height: r.height | 0,
+  };
+  saveLayoutMap(map);
+}
+
+function makeMovable(card) {
+  const header = card.querySelector('h2');
+  if (!header) return;
+  header.addEventListener('pointerdown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;  // ignore ⤢ click
+    e.preventDefault();
+    liftCardToFloating(card);
+    const startX = e.clientX, startY = e.clientY;
+    const r = card.getBoundingClientRect();
+    const startLeft = r.left, startTop = r.top;
+    card.style.zIndex = '90';
+    document.body.style.cursor = 'grabbing';
+    function move(ev) {
+      card.style.left = (startLeft + ev.clientX - startX) + 'px';
+      card.style.top = (startTop + ev.clientY - startY) + 'px';
+    }
+    function up() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.style.cursor = '';
+      persistCard(card);
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+
+  // Resize handle in the SE corner
+  if (!card.querySelector('.resize-handle')) {
+    const h = document.createElement('div');
+    h.className = 'resize-handle';
+    card.appendChild(h);
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      liftCardToFloating(card);
+      const startX = e.clientX, startY = e.clientY;
+      const r = card.getBoundingClientRect();
+      const sw = r.width, sh = r.height;
+      document.body.style.cursor = 'nwse-resize';
+      function move(ev) {
+        card.style.width = Math.max(220, sw + ev.clientX - startX) + 'px';
+        card.style.height = Math.max(120, sh + ev.clientY - startY) + 'px';
+      }
+      function up() {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        document.body.style.cursor = '';
+        persistCard(card);
+      }
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+  }
+}
+
+function wireLayout() {
+  restoreLayout();
+  for (const card of document.querySelectorAll('.card')) {
+    makeMovable(card);
+  }
+  const reset = document.getElementById('reset-layout');
+  if (reset) {
+    reset.addEventListener('click', () => {
+      localStorage.removeItem(LAYOUT_KEY);
+      for (const card of document.querySelectorAll('.card.floating')) {
+        card.classList.remove('floating');
+        card.style.left = card.style.top = card.style.width = card.style.height = '';
+        card.style.zIndex = '';
+      }
+      if (state.face?.pulse) state.face.pulse(0.5, 700);
+    });
+  }
+}
+
 
 // ─── Compose dock — the invisible text channel under Penelope ──
 // Type text + paste/drag-drop images, screenshots, files, or links.

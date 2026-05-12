@@ -8,8 +8,8 @@
   --accent-glow: rgba(0, 229, 255, 0.7);
   --panel-bg: rgba(0, 12, 20, 0.55);
   --panel-border: rgba(0, 229, 255, 0.28);
-  --text: #d6f7ff;
-  --text-dim: rgba(214, 247, 255, 0.55);
+  --text: #f5fbff;
+  --text-dim: rgba(245, 251, 255, 0.6);
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
 }
@@ -343,3 +343,45 @@ body.detached #stage { padding: 0; }
 body.detached .card {
   border: 1px solid var(--accent-faint);
 }
+
+/* Compose input — pure white text on dark, blue caret */
+#compose-input { color: #ffffff; }
+
+/* Modular card layout — once Dylan drags or resizes a card,
+   it goes position:fixed and stays where he put it. */
+.card.floating {
+  position: fixed;
+  z-index: 30;
+  box-shadow: 0 6px 24px rgba(0, 229, 255, 0.06),
+              0 0 0 1px var(--accent-faint);
+}
+.card.floating > h2 { cursor: move; }
+
+/* Corner resize grip, visible only on hover */
+.resize-handle {
+  position: absolute;
+  width: 14px; height: 14px;
+  right: 0; bottom: 0;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg,
+              transparent 0%, transparent 45%,
+              var(--accent-dim) 45%, var(--accent-dim) 55%,
+              transparent 55%, transparent 70%,
+              var(--accent-faint) 70%, var(--accent-faint) 80%,
+              transparent 80%);
+  opacity: 0.25;
+  transition: opacity 0.15s ease;
+}
+.card:hover .resize-handle { opacity: 0.85; }
+.card .resize-handle:hover { opacity: 1; }
+
+/* Tiny "reset layout" button in topbar — undoes everything */
+#reset-layout {
+  background: transparent; border: 0;
+  color: var(--accent); opacity: 0.3;
+  font-size: 10px; padding: 2px 8px;
+  cursor: pointer; font-family: var(--mono);
+  letter-spacing: 0.15em; text-transform: uppercase;
+  pointer-events: auto;
+}
+#reset-layout:hover { opacity: 1; }
