@@ -387,10 +387,18 @@ async function handleWake(data) {
     return;
   }
   state.active = true;
-  // Drop the pre-wake mask so modules become visible (boot sequence
-  // will then slide them in from the edges).
   document.body.classList.remove('pre-wake');
-  // Face starts scattered — explicit reset so we always re-play assembly
+
+  // Wait for the 267MB face cloud to finish parsing onto the GPU
+  // before kicking off the boot animation. Otherwise particles pop
+  // in mid-assembly looking glitchy.
+  if (state.face && !state.face._ready) {
+    $('status-text').textContent = 'loading';
+    console.log('[wake] waiting for face cloud…');
+    await state.face.whenReady();
+    console.log('[wake] face ready');
+  }
+
   state.face.uniforms.uBootProgress.value = 0;
   if (isFull) {
     try { await window.penelope.call('play_wake_song', {}); } catch {}

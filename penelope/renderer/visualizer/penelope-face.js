@@ -29,6 +29,8 @@ export class PenelopeFace {
     this._mode = 'warm';
     this._idleIntensity = 0.65;
     this._breathRate = 0.45;
+    this._ready = false;
+    this._readyResolvers = [];
     this._vJaw = 0; this._vCheek = 0; this._vEye = 0;
     this._vMouthOpen = 0; this._vMouthWide = 0;
     this._vIntensity = 0.65;
@@ -287,6 +289,16 @@ export class PenelopeFace {
     this.points = new THREE.Points(geo, mat);
     this.scene.add(this.points);
     console.log(`[face] mesh on GPU. total boot ${(performance.now()-t0)|0}ms`);
+
+    // Mark ready and resolve any pending awaiters
+    this._ready = true;
+    while (this._readyResolvers.length) this._readyResolvers.shift()();
+  }
+
+  /** Promise that resolves when the cloud is on the GPU and rendering. */
+  whenReady() {
+    if (this._ready) return Promise.resolve();
+    return new Promise((res) => this._readyResolvers.push(res));
   }
 
   _scheduleBlink() {

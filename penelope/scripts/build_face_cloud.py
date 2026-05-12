@@ -144,11 +144,13 @@ def build_hair_layer(N_hair: int, rng: np.random.Generator) -> np.ndarray:
     cx_norm = 0.5     # rough center; could be tightened
     world_x = ((px / W_img) - cx_norm) * scale * 1.778   # 16:9 correction
     world_y = -((py / H_img) - cy_norm) * scale
-    # Face z range is -0.52..0.55 (back of skull to nose tip). Place
-    # hair clearly BEHIND the back of the skull: z = -0.85..-0.55.
-    # When the head rotates, the hair plane stays behind, framing it
-    # like a 2D background billboard inside the 3D scene.
-    world_z = -0.85 + rng.random(N_hair, dtype=np.float32) * 0.30
+    # Curved depth — hair forms a 3D shell behind/around the head, not
+    # a flat plane. Hair at the centerline goes deep (z=-0.85), hair at
+    # the sides comes forward (z=-0.40) so when the head rotates, the
+    # hair shell rotates naturally with it.
+    x_norm = world_x / np.maximum(1e-6, np.abs(world_x).max())  # -1..1
+    curve = 0.30 * (1.0 - x_norm * x_norm)  # parabolic, max at center
+    world_z = -0.40 - curve - rng.random(N_hair, dtype=np.float32) * 0.10
     pos = np.stack([world_x.astype(np.float32),
                     world_y.astype(np.float32),
                     world_z.astype(np.float32)], axis=1)
