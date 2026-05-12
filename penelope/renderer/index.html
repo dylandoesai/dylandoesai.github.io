@@ -31,23 +31,24 @@
          the same cyan-additive material as her face. Same drag/resize. -->
     <div class="module" id="m-revenue" data-mod="revenue">
       <div class="m-label">REVENUE · MTD</div>
-      <canvas class="m-canvas" id="rev-big" width="220" height="46"></canvas>
-      <canvas class="m-canvas chart" id="rev-chart" width="240" height="64"></canvas>
+      <div class="m-big-num" id="rev-big">$0.00</div>
+      <div class="m-bars" id="rev-chart"></div>
+      <div class="m-foot" id="rev-foot"></div>
     </div>
 
     <div class="module" id="m-weather" data-mod="weather">
       <div class="m-label" id="wx-label">WEATHER</div>
-      <canvas class="m-canvas" id="wx-temp" width="200" height="56"></canvas>
+      <div class="m-big-num" id="wx-temp">--°</div>
     </div>
 
     <div class="module" id="m-schedule" data-mod="schedule">
       <div class="m-label">TODAY</div>
-      <canvas class="m-canvas tall" id="sched-graph" width="240" height="80"></canvas>
+      <ul class="m-text-list" id="sched-list"></ul>
     </div>
 
     <div class="module" id="m-todos" data-mod="todos">
       <div class="m-label">REMINDERS</div>
-      <canvas class="m-canvas tall" id="todo-graph" width="240" height="80"></canvas>
+      <ul class="m-text-list" id="todo-list"></ul>
     </div>
 
     <!-- One floating constellation per brand. Each lists ALL 5 platforms

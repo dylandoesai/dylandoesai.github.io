@@ -102,15 +102,16 @@ async function buildChannelConstellations() {
     el.dataset.handles = JSON.stringify(
       Object.fromEntries(PLATFORMS.map(p => [p.key, ((ch.platforms || {})[p.key] || {}).handle || '']))
     );
-    // Each channel: name + a 5-bar particle chart (one bar per platform)
+    // Each channel: name + readable 5-bar chart with subs counts
     el.innerHTML = `
       <div class="ch-name">${escapeHtml(ch.name)}</div>
-      <canvas class="ch-chart" data-ch="${ch.id}" width="220" height="32"></canvas>
+      <div class="ch-bars m-bars" data-ch="${ch.id}"></div>
+      <div class="ch-foot" data-ch-foot="${ch.id}"></div>
     `;
     host.appendChild(el);
   }
-  // Click a channel's chart → opens upload-post analytics for that user
-  for (const c of host.querySelectorAll('.ch-chart')) {
+  // Click a channel's bar chart → opens upload-post analytics
+  for (const c of host.querySelectorAll('.ch-bars')) {
     c.addEventListener('click', () => {
       if (window.penelope?.openExternal) {
         window.penelope.openExternal('https://app.upload-post.com/analytics');
@@ -134,8 +135,23 @@ function fillChannelData(analytics, channelsCfg) {
   for (const ch of (channelsCfg?.channels || [])) {
     // Build a 5-element vector — one bar per platform, value = 28d views
     const vals = PLATFORMS.map(p => byBrand[ch.name]?.[p.key]?.views_28d || 0);
-    const canvas = document.querySelector(`.ch-chart[data-ch="${ch.id}"]`);
-    if (canvas) barChart(canvas, vals);
+    const bars = document.querySelector(`.ch-bars[data-ch="${ch.id}"]`);
+    if (bars) {
+      bars.innerHTML = '';
+      const max = Math.max(1, ...vals);
+      vals.forEach((v, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = `${Math.max(2, (v / max) * 100)}%`;
+        bar.title = `${PLATFORMS[i].short}: ${fmt(v)} views (28d)`;
+        bars.appendChild(bar);
+      });
+    }
+    const foot = document.querySelector(`[data-ch-foot="${ch.id}"]`);
+    if (foot) {
+      const total = vals.reduce((a, b) => a + b, 0);
+      foot.textContent = total ? `${fmt(total)} VIEWS · 28D` : '—';
+    }
   }
 }
 
@@ -145,18 +161,20 @@ function defaultPositions() {
   // Don't override anything that's been moved already
   const map = loadLayoutMap();
   const W = window.innerWidth, H = window.innerHeight;
+  // Left edge: 4 personal modules stacked top-to-bottom
   const defaults = {
-    'm-revenue':   { left: 28,            top: 90  },
-    'm-weather':   { left: 28,            top: H - 200 },
-    'm-schedule':  { left: 28,            top: H - 360 },
-    'm-todos':     { left: W - 260,       top: H - 360 },
+    'm-revenue':   { left: 28,    top: 90 },
+    'm-weather':   { left: 28,    top: 250 },
+    'm-schedule':  { left: 28,    top: 380 },
+    'm-todos':     { left: 28,    top: 560 },
   };
-  // Stack 7 channels down the right edge
+  // Right edge: 7 channels stacked top-to-bottom, narrower so they fit
   const channels = document.querySelectorAll('.channel-mod');
+  const chHeight = Math.max(86, Math.floor((H - 120) / Math.max(1, channels.length)));
   channels.forEach((c, i) => {
     if (!map[c.id]) {
       c.style.left = (W - 260) + 'px';
-      c.style.top  = (90 + i * 92) + 'px';
+      c.style.top  = (90 + i * chHeight) + 'px';
     }
   });
   for (const [id, p] of Object.entries(defaults)) {
@@ -254,19 +272,27 @@ async function refreshAll() {
 
 function renderRevenue(rev) {
   if (!rev) return;
-  // Big number in particles
-  bigNumber($('rev-big'), `$${(rev.total_mtd || 0).toFixed(2)}`);
-  // Source breakdown as a particle bar chart
+  const big = $('rev-big');
+  big.textContent = `$${(rev.total_mtd || 0).toFixed(2)}`;
+  big.onclick = () => {
+    window.penelope?.openExternal?.('https://connect.stripe.com/express_login');
+    state.face?.pulse?.(0.3);
+  };
+  // Real bars per source — readable, hover for source name
   const sources = (rev.sources || []).filter(s => s.name);
-  const vals = sources.map(s => Math.max(0, s.mtd || 0));
-  barChart($('rev-chart'), vals);
-  // Click → open Stripe Express where ElevenLabs / Gumroad land
-  for (const c of [$('rev-big'), $('rev-chart')]) {
-    c.onclick = () => {
-      window.penelope?.openExternal?.('https://connect.stripe.com/express_login');
-      state.face?.pulse?.(0.3);
-    };
+  const chart = $('rev-chart');
+  chart.innerHTML = '';
+  const max = Math.max(1, ...sources.map(s => s.mtd || 0));
+  for (const s of sources) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = `${Math.max(2, (s.mtd / max) * 100)}%`;
+    bar.title = `${s.name}: $${(s.mtd || 0).toFixed(2)}`;
+    chart.appendChild(bar);
   }
+  chart.onclick = () => window.penelope?.openExternal?.('https://connect.stripe.com/express_login');
+  // Footer: source names
+  $('rev-foot').textContent = sources.map(s => s.name.toUpperCase()).join(' · ');
 }
 
 function renderWeather(wx) {
@@ -275,31 +301,46 @@ function renderWeather(wx) {
   const c = wx.condition || '';
   const city = wx.city ? ` · ${wx.city.toUpperCase()}` : '';
   $('wx-label').textContent = `WEATHER${city}${c ? ' · ' + c.toUpperCase() : ''}`;
-  bigNumber($('wx-temp'), `${t}°`);
-  $('wx-temp').onclick = () => {
+  const big = $('wx-temp');
+  big.textContent = `${t}°`;
+  big.onclick = () => {
     window.penelope?.openExternal?.('weather://');
     state.face?.pulse?.(0.3);
   };
 }
 
 function renderSchedule(schedule, todos) {
-  // Schedule → bar chart with one bar per event (each bar height = duration
-  // or just constant). Empty → empty chart.
+  // Real text list of today's calendar events
   const events = (schedule?.events || []).slice(0, 6);
-  const vals = events.length ? events.map(() => 1) : [0];
-  barChart($('sched-graph'), vals);
-  $('sched-graph').onclick = () => {
-    window.penelope?.openExternal?.('ical://');
-    state.face?.pulse?.(0.3);
-  };
+  const sched = $('sched-list');
+  sched.innerHTML = '';
+  if (!events.length) {
+    sched.innerHTML = '<li class="empty">nothing on the calendar</li>';
+  } else {
+    for (const e of events) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="t">${escapeHtml(e.time || '')}</span>` +
+                     `<span>${escapeHtml(e.title || '')}</span>`;
+      li.onclick = () => window.penelope?.openExternal?.('ical://');
+      sched.appendChild(li);
+    }
+  }
 
+  // Real text list of today's reminders
   const items = (todos?.items || []).slice(0, 8);
-  const tvals = items.length ? items.map((_, i) => items.length - i) : [0];
-  barChart($('todo-graph'), tvals);
-  $('todo-graph').onclick = () => {
-    window.penelope?.openExternal?.('x-apple-reminderkit://');
-    state.face?.pulse?.(0.3);
-  };
+  const todo = $('todo-list');
+  todo.innerHTML = '';
+  if (!items.length) {
+    todo.innerHTML = '<li class="empty">no reminders scheduled today</li>';
+  } else {
+    for (const it of items) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="t">·</span>` +
+                     `<span>${escapeHtml(it.text || '')}</span>`;
+      li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
+      todo.appendChild(li);
+    }
+  }
 }
 
 // ── Python event dispatch ──────────────────────────────────────────────
@@ -370,11 +411,27 @@ function wireCompose() {
     const div = document.createElement('div');
     div.className = `msg ${role}`;
     div.innerHTML = html;
+    // Any <a> inside this message routes through openExternal so Electron
+    // hands the URL to the system browser instead of trying to navigate.
+    div.querySelectorAll('a[href]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const u = a.getAttribute('href');
+        if (u) window.penelope?.openExternal?.(u);
+      });
+    });
     thread.appendChild(div);
     thread.scrollTop = thread.scrollHeight;
     if (state.face?.pulse) state.face.pulse(0.25, 400);
   }
-  window.penelopeCompose = { appendThread };
+  // Auto-linkify a plain-text message body before appending.
+  function appendTextWithLinks(role, text) {
+    const safe = escapeHtml(text);
+    const linked = safe.replace(/(https?:\/\/[^\s<>"']+)/g,
+      '<a href="$1">$1</a>');
+    appendThread(role, linked);
+  }
+  window.penelopeCompose = { appendThread, appendTextWithLinks };
 
   async function fileToB64(file) {
     return new Promise((res, rej) => {
@@ -434,7 +491,7 @@ function wireCompose() {
 }
 
 function appendThread(role, text) {
-  if (window.penelopeCompose) window.penelopeCompose.appendThread(role, escapeHtml(text));
+  if (window.penelopeCompose) window.penelopeCompose.appendTextWithLinks(role, String(text));
 }
 
 async function playTts(url, visemes) {

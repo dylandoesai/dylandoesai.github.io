@@ -79,16 +79,12 @@ async def next_utterance(state):
         return None
     pcm = np.frombuffer(buffer, dtype=np.int16).astype(np.float32) / 32768.0
 
-    # Speaker-ID gate: if Dylan has enrolled, drop utterances that don't
-    # match his voice. Fail-open if not enrolled.
-    try:
-        import voice_id
-        if voice_id.owner_enrolled():
-            is_owner, sim = voice_id.is_owner(pcm)
-            if not is_owner:
-                # Not Dylan — silently ignore the utterance.
-                return None
-    except Exception:
-        pass
+    # Voice-ID is intentionally OFF here too. The enrolled embedding came
+    # from a studio reference and doesn't transfer cleanly to the MBAir
+    # built-in mic — sims for honest matches bounce 0.38-0.66, so the
+    # gate silently dropped every utterance during conversation. Penelope
+    # would receive the daily brief but never respond to follow-ups.
+    # When/if Dylan re-enrolls from the live mic, this can come back on
+    # via a config flag.
 
     return pcm

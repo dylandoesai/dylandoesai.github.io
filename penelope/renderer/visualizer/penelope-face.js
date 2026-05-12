@@ -262,8 +262,34 @@ export class PenelopeFace {
     console.log(`[face] built ${placed} particles from image`);
   }
 
-  _loadImage(src) {
-    return new Promise((res, rej) => {
+  async _loadImage(src) {
+    // In a packaged Electron build the assets live inside app.asar.unpacked
+    // and the relative file:// path inside app.asar doesn't always resolve
+    // for <img> tags. Prefer the IPC channel (returns base64) which goes
+    // through main.js's resolveProjectFile -> unpacked path. Fall back to
+    // a direct URL load for dev mode where assets are next to the script.
+    const rel = src.startsWith('../') ? src.slice(3) : src;
+    if (window.penelope?.readAsset) {
+      try {
+        const b64 = await window.penelope.readAsset(rel);
+        if (b64) {
+          // Detect type from extension; default to png — webp/jpeg both work
+          const ext = rel.split('.').pop().toLowerCase();
+          const mime = ext === 'webp' ? 'image/webp'
+                     : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+                     : ext === 'png' ? 'image/png' : 'image/*';
+          return await new Promise((res, rej) => {
+            const img = new Image();
+            img.onload = () => res(img);
+            img.onerror = (e) => rej(e);
+            img.src = `data:${mime};base64,${b64}`;
+          });
+        }
+      } catch (e) {
+        console.warn('[face] readAsset failed, falling back to URL:', e);
+      }
+    }
+    return await new Promise((res, rej) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => res(img);

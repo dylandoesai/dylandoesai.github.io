@@ -156,6 +156,69 @@ body.show-cursor { cursor: default; }
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
+/* Readable big number — same cyan glow as the rest of the UI but
+   actually LEGIBLE. No particle stippling. */
+.m-big-num {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 200;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-shadow:
+    0 0 8px var(--accent-glow),
+    0 0 22px rgba(0, 229, 255, 0.5),
+    0 0 44px rgba(0, 229, 255, 0.2);
+  line-height: 1.05;
+  cursor: pointer;
+}
+.m-foot {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.15em; color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Simple SVG-shaped CSS bar chart — clearly bars, not blobs */
+.m-bars {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 36px; margin-top: 6px;
+  cursor: pointer;
+}
+.m-bars .bar {
+  flex: 1 1 0;
+  min-width: 6px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 229, 255, 0.85),
+    rgba(0, 229, 255, 0.35)
+  );
+  box-shadow: 0 0 6px var(--accent-glow);
+  border-radius: 1px;
+}
+
+/* Readable text list — actual reminder / event lines */
+.m-text-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 4px;
+  font-family: var(--mono); font-size: 12px;
+  max-height: 220px; overflow-y: auto;
+}
+.m-text-list li {
+  display: flex; gap: 8px; align-items: baseline;
+  color: var(--text);
+  text-shadow: 0 0 4px var(--accent-glow);
+  cursor: pointer;
+}
+.m-text-list li:hover { color: var(--accent); }
+.m-text-list li .t {
+  color: var(--accent); font-size: 10px; min-width: 52px;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.m-text-list .empty {
+  color: var(--text-dim); font-size: 11px; opacity: 0.5;
+}
+
 .m-list {
   display: flex; flex-direction: column; gap: 2px;
   margin-top: 4px;
@@ -238,6 +301,17 @@ body.show-cursor { cursor: default; }
   color: var(--text);
   text-shadow: 0 0 6px var(--accent-glow);
 }
+.ch-bars {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 22px; margin-top: 4px;
+  cursor: pointer;
+  min-width: 200px;
+}
+.ch-foot {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.18em; color: var(--text-dim);
+  margin-top: 2px;
+}
 
 /* Resize affordance — tiny dots only visible on hover */
 .resize-handle {
@@ -259,23 +333,28 @@ body.show-cursor { cursor: default; }
   box-shadow: 0 0 6px var(--accent-glow);
 }
 
-/* Compose dock — invisible text channel below face */
+/* Compose dock — invisible text channel ALL THE WAY at the bottom.
+   The brief gets spoken; we don't need to also dump a wall of text
+   in the middle of the interface. Keep the thread very short so the
+   compose dock stays a thin strip at the bottom even with messages. */
 #compose-dock {
   position: absolute;
   left: 50%; transform: translateX(-50%);
-  bottom: 6%;
-  width: min(640px, 60vw);
+  bottom: 18px;
+  width: min(720px, 70vw);
   z-index: 25;
   pointer-events: auto;
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 4px;
 }
 #compose-thread {
-  display: flex; flex-direction: column; gap: 4px;
-  max-height: 220px; overflow-y: auto;
-  font-family: var(--mono); font-size: 12px;
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 56px; overflow-y: auto;
+  font-family: var(--mono); font-size: 11px;
   color: var(--text-dim);
   padding: 0 4px;
 }
+/* Only show the last 2 turns so the thread never grows */
+#compose-thread .msg:nth-last-child(n+3) { display: none; }
 #compose-thread .msg {
   padding: 6px 10px;
   border-left: 1px solid var(--accent-faint);
