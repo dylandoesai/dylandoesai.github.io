@@ -18,7 +18,7 @@
 // id (0=skull, 1=jaw, 2=mouth, 3=eyes, 4=cheeks, 5=brows, 6=ambient).
 // The shader displaces particles based on uniforms set from the JS layer.
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three.module.js';
 import { FACE_POINTS } from './face-landmarks.js';
 
 const VERT = /* glsl */ `
@@ -91,12 +91,12 @@ const VERT = /* glsl */ `
     gl_Position = projectionMatrix * mv;
 
     float size = mix(1.5, 2.4, seedV.x);
-    if (aCluster > 6.5) size *= 0.5; // ambient
-    if (aCluster > 1.5 && aCluster < 4.5) size *= 1.15; // feature accents
-    gl_PointSize = size * (300.0 / -mv.z) * (0.7 + 0.6 * uBootProgress);
+    if (aCluster > 6.5) size *= 0.4; // ambient
+    if (aCluster > 1.5 && aCluster < 4.5) size *= 0.9; // feature accents (was 1.15 — too thick)
+    gl_PointSize = size * (180.0 / -mv.z) * (0.7 + 0.6 * uBootProgress);  // tighter falloff so the face reads as a constellation, not a glow ball
 
     vCluster = aCluster;
-    vGlow = uIntensity * (0.6 + 0.4 * seedV.y);
+    vGlow = uIntensity * (0.35 + 0.25 * seedV.y);   // half the bloom — let geometry read through
   }
 `;
 
@@ -152,7 +152,7 @@ export class PenelopeFace {
       uMouthWide: { value: 0 },
       uCheek: { value: 0 },
       uEye: { value: 0 },
-      uIntensity: { value: 0.6 },
+      uIntensity: { value: 0.35 },
       uBootProgress: { value: 0 },
     };
 
@@ -254,15 +254,15 @@ export class PenelopeFace {
   setMode(mode) {
     this._mode = mode || 'warm';
     if (mode === 'flirty') {
-      this._idleIntensity = 0.72;
+      this._idleIntensity = 0.45;
       this._breathRate = 0.32;     // slower, deeper
       this._ambientDrift = 1.4;
     } else if (mode === 'professional') {
-      this._idleIntensity = 0.48;
+      this._idleIntensity = 0.28;
       this._breathRate = 0.55;     // steadier
       this._ambientDrift = 0.7;    // less drift, crisper
     } else { // warm (default)
-      this._idleIntensity = 0.6;
+      this._idleIntensity = 0.35;
       this._breathRate = 0.45;
       this._ambientDrift = 1.0;
     }

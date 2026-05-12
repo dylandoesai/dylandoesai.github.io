@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file: data: blob:; img-src 'self' data: blob:;" />
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' file: data: blob:; img-src 'self' data: blob:; connect-src 'self' file: data: blob:;" />
   <title>Penelope</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -20,60 +20,44 @@
         <span class="sub" id="status-text">standby</span>
       </div>
       <div class="clock" id="clock">--:--:--</div>
-      <button id="reset-layout" title="Reset panel positions">Reset layout</button>
+      <button id="reset-layout" title="Reset layout">Reset</button>
     </header>
 
-    <aside id="left-panel" class="panel">
-      <section class="card" id="revenue-card">
-        <h2>Revenue <button class="detach" data-panel="revenue" title="Pop out to new window">⤢</button></h2>
-        <div class="big" id="revenue-total">$0</div>
-        <canvas id="revenue-chart" width="320" height="120"></canvas>
-        <ul class="kv" id="revenue-list"></ul>
-      </section>
-      <section class="card" id="todo-card">
-        <h2>Today <button class="detach" data-panel="todo" title="Pop out">⤢</button></h2>
-        <ul id="todo-list"></ul>
-      </section>
-    </aside>
+    <!-- Free-floating chrome-less data constellations. Every "module" is
+         just glowing kinetic text. No borders, no backdrops, no boxes.
+         Each is grabbable and movable to anywhere on screen.            -->
 
-    <aside id="right-panel" class="panel">
-      <section class="card" id="yt-card">
-        <h2>YouTube <button class="detach" data-panel="yt" title="Pop out">⤢</button></h2>
-        <div class="row" id="yt-stats"></div>
-        <canvas id="yt-chart" width="320" height="100"></canvas>
-        <ul class="kv" id="yt-top"></ul>
-      </section>
-      <section class="card" id="tt-card">
-        <h2>TikTok <button class="detach" data-panel="tt" title="Pop out">⤢</button></h2>
-        <div class="row" id="tt-stats"></div>
-        <canvas id="tt-chart" width="320" height="100"></canvas>
-        <ul class="kv" id="tt-top"></ul>
-      </section>
-    </aside>
+    <div class="module" id="m-revenue" data-mod="revenue">
+      <div class="m-label">REVENUE · MTD</div>
+      <div class="m-big" id="rev-mtd">—</div>
+      <div class="m-list" id="rev-sources"></div>
+    </div>
 
-    <footer id="bottom-panel">
-      <section class="card" id="schedule-card">
-        <h2>Schedule <button class="detach" data-panel="schedule" title="Pop out">⤢</button></h2>
-        <ul id="schedule-list"></ul>
-      </section>
-      <section class="card" id="weather-card">
-        <h2>Weather <button class="detach" data-panel="weather" title="Pop out">⤢</button></h2>
-        <div id="weather-now"></div>
-      </section>
-      <section class="card" id="transcript-card">
-        <h2>Conversation <button class="detach" data-panel="transcript" title="Pop out">⤢</button></h2>
-        <div id="transcript"></div>
-      </section>
-    </footer>
+    <div class="module" id="m-weather" data-mod="weather">
+      <div class="m-label">WEATHER</div>
+      <div class="m-big" id="wx-temp">—</div>
+      <div class="m-sub" id="wx-cond"></div>
+    </div>
+
+    <div class="module" id="m-schedule" data-mod="schedule">
+      <div class="m-label">TODAY</div>
+      <ul class="m-thin" id="sched-list"></ul>
+    </div>
+
+    <div class="module" id="m-todos" data-mod="todos">
+      <div class="m-label">REMINDERS</div>
+      <ul class="m-thin" id="todo-list"></ul>
+    </div>
+
+    <!-- One floating constellation per brand. Each lists ALL 5 platforms
+         with subs + 28d views. 7 channels = 7 modules.                  -->
+    <div id="channels-host"></div>
 
     <div id="boot-overlay" class="hidden">
       <div class="boot-text" id="boot-text">INITIALIZING…</div>
     </div>
 
-    <!-- Invisible compose surface — the text channel underneath the
-         persona. Type, paste links / screenshots / files, or drag-drop
-         them. Penelope speaks her reply; any links / code / long text
-         she returns render in #compose-thread above the input. -->
+    <!-- Invisible compose surface — the text channel under the persona -->
     <div id="compose-dock" aria-label="Compose">
       <div id="compose-thread"></div>
       <div id="compose-row">
@@ -84,13 +68,8 @@
     </div>
   </main>
 
-  <!-- Wake song is played by Spotify via the Python sidecar (AppleScript).
-       Only the TTS audio element lives in the renderer. -->
   <audio id="tts-audio" preload="auto"></audio>
 
-  <script type="importmap">
-    { "imports": { "three": "./vendor/three.module.js" } }
-  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor, shell, systemPreferences } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { execSync } = require('node:child_process');
@@ -39,6 +39,11 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   // No ready-to-show -> stays invisible until wake.
+  // DEV: open DevTools so any renderer crash is visible during shake-out.
+  if (process.env.PENELOPE_DEV === '1') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.show();
+  }
 
   if (app.dock) app.dock.hide(); // background-only by default
 
@@ -223,12 +228,37 @@ function ensureLoginItem() {
   }
 }
 
+async function requestMacPermissions() {
+  // Force the mic/camera permission prompts to fire from the main
+  // (visible) Electron process so the OS dialog isn't hidden behind
+  // the invisible Python child. We don't need the audio here — the
+  // sounddevice library in Python will inherit the granted state.
+  try {
+    if (process.platform === 'darwin' && systemPreferences) {
+      const micState = systemPreferences.getMediaAccessStatus('microphone');
+      if (micState !== 'granted') {
+        await systemPreferences.askForMediaAccess('microphone');
+      }
+      const camState = systemPreferences.getMediaAccessStatus('camera');
+      if (camState !== 'granted') {
+        await systemPreferences.askForMediaAccess('camera');
+      }
+    }
+  } catch (e) {
+    console.warn('[perms] askForMediaAccess failed:', e?.message);
+  }
+}
+
 app.whenReady().then(() => {
   createWindow();
+  // Start the Python sidecar IMMEDIATELY so the renderer's RPC calls
+  // have something on the other end. Ask for mic/camera permissions in
+  // parallel — the prompts fire from the visible main process.
   startPython();
   wirePowerEvents();
   ensureLoginItem();
   applyPowerProfile();
+  requestMacPermissions().catch(() => {});
 });
 
 app.on('window-all-closed', () => {

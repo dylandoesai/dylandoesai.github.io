@@ -79,13 +79,16 @@ function clusterOfMediaPipeIndex(i) {
   return 1;
 }
 
+// Density per cluster — tuned down from earlier (14/10/8…) which made
+// the face read as a glowing blob. Lower density + smaller particles
+// lets her actual landmark contours come through.
 function densityOf(c) {
-  if (c === 3) return 14;
-  if (c === 4) return 10;
-  if (c === 2) return 8;
-  if (c === 5) return 6;
-  if (c === 6) return 6;
-  return 4;
+  if (c === 3) return 4;   // lips
+  if (c === 4) return 3;   // eyes
+  if (c === 2) return 2;   // jaw
+  if (c === 5) return 2;   // cheeks
+  if (c === 6) return 2;   // brows
+  return 1;                 // skull shell / backdrop
 }
 
 function facePointsFromMediaPipe(points) {

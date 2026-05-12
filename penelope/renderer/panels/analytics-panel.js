@@ -63,9 +63,10 @@ function renderPlatform(prefix, p) {
     }
   }
   all.sort((a, b) => (b.views || 0) - (a.views || 0));
-  // Fallback: if no top videos, show per-channel rows with subs/views_28d
+  // Fallback: if no top videos, show ALL 7 channels with subs/views_28d
+  // (no slice cap — Dylan has 7 brands and they all need to be visible).
   if (!all.length) {
-    for (const c of channels.slice(0, 4)) {
+    for (const c of channels) {
       const el = document.createElement('li');
       el.innerHTML = `<span>${c.name}</span><b>${fmt(c.subs || 0)} subs · ${fmt(c.views_28d || 0)} v</b>`;
       el.style.cursor = 'pointer';

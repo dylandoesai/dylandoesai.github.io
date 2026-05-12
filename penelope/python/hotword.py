@@ -81,14 +81,22 @@ def _run_porcupine(access_key: str, ppn_paths, labels, on_detect):
 def _run_whisper_fallback(on_detect):
     from faster_whisper import WhisperModel
     import voice_id
+    print("[hotword] loading whisper tiny.en …", file=sys.stderr, flush=True)
     model = WhisperModel("tiny.en", compute_type="int8")
     sr = 16000
     window = 2.0  # seconds
     step = 0.6    # seconds between checks
     buf = np.zeros(int(sr * window), dtype=np.float32)
-    # Voice-ID gating: if Dylan has enrolled, only fire on his voice.
-    # If no profile exists, fail-open (Penelope still usable pre-enrollment).
     require_owner = voice_id.owner_enrolled()
+    print(f"[hotword] whisper ready. voice_id gate={require_owner}", file=sys.stderr, flush=True)
+
+    # Sanity-check the mic before entering the loop
+    try:
+        devs = sd.query_devices(kind='input')
+        print(f"[hotword] default mic: {devs.get('name','?')} @ {devs.get('default_samplerate','?')}",
+              file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"[hotword] could not query mic: {e}", file=sys.stderr, flush=True)
 
     def cb(indata, *_):
         nonlocal buf
@@ -96,39 +104,53 @@ def _run_whisper_fallback(on_detect):
         buf = np.roll(buf, -len(block))
         buf[-len(block):] = block
 
-    with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
-                        callback=cb, blocksize=int(sr * step)):
-        last_check = 0
-        while True:
-            now = time.time()
-            if now - last_check < step:
-                time.sleep(0.05); continue
-            last_check = now
-            audio = buf.copy()
-            # Quick energy gate to skip silence
-            if float(np.abs(audio).mean()) < 0.004:
-                continue
-            try:
-                segments, _ = model.transcribe(
-                    audio, language="en", beam_size=1,
-                    vad_filter=True, condition_on_previous_text=False)
-                text = " ".join(seg.text for seg in segments).lower().strip()
-            except Exception:
-                continue
-            if not text:
-                continue
-            which = _match_wake(text)
-            if which:
-                if require_owner:
-                    is_owner, sim = voice_id.is_owner(buf.copy())
-                    if not is_owner:
-                        print(f"[hotword] ignored '{which}' — speaker sim={sim:.2f}",
-                              file=sys.stderr)
-                        continue
-                on_detect(which)
-                # cool-down so we don't re-fire on echo of the song
-                time.sleep(15)
-                buf[:] = 0
+    try:
+        stream = sd.InputStream(samplerate=sr, channels=1, dtype="float32",
+                                callback=cb, blocksize=int(sr * step))
+        stream.start()
+        print("[hotword] mic stream open — listening", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"[hotword] FAILED to open mic stream: {e}", file=sys.stderr, flush=True)
+        return
+
+    last_check = 0
+    last_status = 0
+    while True:
+        now = time.time()
+        if now - last_check < step:
+            time.sleep(0.05); continue
+        last_check = now
+        audio = buf.copy()
+        energy = float(np.abs(audio).mean())
+        # Heartbeat every 5s so we know the loop is alive even when quiet
+        if now - last_status > 5:
+            print(f"[hotword] energy={energy:.4f} (waiting for speech)",
+                  file=sys.stderr, flush=True)
+            last_status = now
+        if energy < 0.004:
+            continue
+        try:
+            segments, _ = model.transcribe(
+                audio, language="en", beam_size=1,
+                vad_filter=True, condition_on_previous_text=False)
+            text = " ".join(seg.text for seg in segments).lower().strip()
+        except Exception:
+            continue
+        if not text:
+            continue
+        print(f"[hotword] heard: {text!r}", file=sys.stderr, flush=True)
+        which = _match_wake(text)
+        if which:
+            if require_owner:
+                is_owner, sim = voice_id.is_owner(buf.copy())
+                if not is_owner:
+                    print(f"[hotword] ignored '{which}' — speaker sim={sim:.2f}",
+                          file=sys.stderr, flush=True)
+                    continue
+            print(f"[hotword] WAKE: {which}", file=sys.stderr, flush=True)
+            on_detect(which)
+            time.sleep(15)
+            buf[:] = 0
 
 
 PAPI_VARIANTS = [

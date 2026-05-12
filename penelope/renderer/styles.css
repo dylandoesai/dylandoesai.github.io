@@ -1,15 +1,15 @@
-/* Penelope — pure black + electric cyan (#00E5FF). Fully chromeless. */
+/* Penelope — Transcendence aesthetic: pure black, electric cyan #00E5FF,
+   chrome-less floating data constellations. No boxes, no borders. Every
+   number is glowing kinetic text with subtle particle ambient. */
 
 :root {
   --bg: #000000;
   --accent: #00E5FF;
   --accent-dim: rgba(0, 229, 255, 0.5);
   --accent-faint: rgba(0, 229, 255, 0.18);
-  --accent-glow: rgba(0, 229, 255, 0.7);
-  --panel-bg: rgba(0, 12, 20, 0.55);
-  --panel-border: rgba(0, 229, 255, 0.28);
+  --accent-glow: rgba(0, 229, 255, 0.75);
   --text: #f5fbff;
-  --text-dim: rgba(245, 251, 255, 0.6);
+  --text-dim: rgba(245, 251, 255, 0.55);
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
 }
@@ -19,245 +19,255 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--sans);
+  font-family: var(--mono);
   -webkit-font-smoothing: antialiased;
-  cursor: none; /* auto-hide cursor */
+  cursor: none;
   user-select: none;
 }
 body.show-cursor { cursor: default; }
 
+/* Faint vertical/horizontal grid — gives the "interface in space" feel */
 #grid-overlay {
   position: fixed; inset: 0; pointer-events: none; z-index: 1;
   background-image:
     linear-gradient(var(--accent-faint) 1px, transparent 1px),
     linear-gradient(90deg, var(--accent-faint) 1px, transparent 1px);
-  background-size: 64px 64px;
-  opacity: 0.15;
+  background-size: 96px 96px;
+  opacity: 0.07;
   mix-blend-mode: screen;
 }
 
-#stage {
-  position: relative; width: 100%; height: 100%;
-}
+#stage { position: relative; width: 100%; height: 100%; }
 
+/* The Three.js particle face fills the whole stage; modules float on top */
 #face-canvas {
   position: absolute; inset: 0; width: 100%; height: 100%;
   z-index: 2;
-  display: block;
 }
 
+/* Topbar — minimal, just brand + clock + reset */
 #topbar {
   position: absolute; top: 0; left: 0; right: 0;
-  height: 56px; padding: 0 24px;
+  height: 56px; padding: 0 28px;
   display: flex; align-items: center; justify-content: space-between;
-  z-index: 10; pointer-events: none;
+  z-index: 50;
+  pointer-events: auto;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 14px; }
 .brand .dot {
-  width: 10px; height: 10px; border-radius: 50%;
+  width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 12px var(--accent), 0 0 24px var(--accent-glow);
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 12px var(--accent), 0 0 28px var(--accent-glow);
+  animation: pulse 2.4s ease-in-out infinite;
 }
 .brand .name {
-  font-family: var(--mono); letter-spacing: 0.4em;
-  color: var(--accent); font-size: 14px; font-weight: 600;
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  font-size: 12px;
+  text-shadow: 0 0 8px var(--accent-glow);
 }
 .brand .sub {
-  font-family: var(--mono); letter-spacing: 0.2em;
-  color: var(--text-dim); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
 }
 .clock {
-  font-family: var(--mono); font-size: 18px;
-  color: var(--accent); text-shadow: 0 0 8px var(--accent-glow);
-  letter-spacing: 0.15em;
+  font-size: 16px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+  letter-spacing: 0.18em;
 }
+#reset-layout {
+  background: transparent; border: 0;
+  color: var(--accent); opacity: 0.25;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  cursor: pointer; padding: 4px 10px;
+  position: absolute; top: 18px; right: 28px;
+}
+#reset-layout:hover { opacity: 1; text-shadow: 0 0 8px var(--accent-glow); }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
+  50% { opacity: 0.5; transform: scale(0.7); }
 }
 
-.panel {
-  position: absolute; z-index: 9;
-  display: flex; flex-direction: column; gap: 16px;
-  width: 360px;
-  padding: 24px 20px;
+/* ── Floating modules — chrome-less, kinetic, draggable ──
+   No background, no border, no backdrop. Just glowing text + a faint
+   particle ambient via ::before pseudos. Each module is absolutely
+   positioned and drag/resize-able. */
+.module {
+  position: absolute;
+  padding: 8px 14px;
+  z-index: 20;
   pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 180px;
+  /* faint kinetic shimmer */
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-#left-panel { left: 0; top: 56px; bottom: 200px; }
-#right-panel { right: 0; top: 56px; bottom: 200px; }
-
-#bottom-panel {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  height: 180px;
-  display: grid; grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px; padding: 16px 24px;
-  z-index: 9;
+.module:hover {
+  z-index: 30;
 }
-
-.card {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 16px 18px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow:
-    0 0 0 1px rgba(0, 229, 255, 0.06) inset,
-    0 0 24px rgba(0, 229, 255, 0.07);
-  position: relative;
-  overflow: hidden;
+.module::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 12px;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(0, 229, 255, 0.06) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0.5;
+  animation: aura 6s ease-in-out infinite alternate;
 }
-.card::before {
-  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.7;
-}
-.card h2 {
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
-  letter-spacing: 0.3em; text-transform: uppercase;
-  color: var(--accent); margin-bottom: 10px;
+@keyframes aura {
+  0%   { opacity: 0.3; transform: scale(0.92); }
+  100% { opacity: 0.7; transform: scale(1.05); }
 }
 
-.big {
-  font-family: var(--mono); font-size: 32px; font-weight: 600;
-  color: var(--text); margin-bottom: 8px;
-  text-shadow: 0 0 12px var(--accent-glow);
+.m-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent-glow);
+  cursor: move;
+  user-select: none;
 }
-
-.kv { list-style: none; }
-.kv li {
-  display: flex; justify-content: space-between; align-items: center;
-  font-family: var(--mono); font-size: 12px;
-  padding: 4px 0;
+.m-big {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--text);
+  text-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 18px rgba(0, 229, 255, 0.4),
+    0 0 36px rgba(0, 229, 255, 0.15);
+  letter-spacing: 0.04em;
+}
+.m-sub {
+  font-size: 11px;
   color: var(--text-dim);
-  border-bottom: 1px dashed rgba(0, 229, 255, 0.1);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
-.kv li:last-child { border-bottom: none; }
-.kv li b { color: var(--text); font-weight: 500; }
+.m-list {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 4px;
+}
+.m-list .row {
+  font-family: var(--mono); font-size: 11px;
+  display: flex; justify-content: space-between; gap: 14px;
+  color: var(--text-dim);
+}
+.m-list .row b {
+  color: var(--text);
+  font-weight: 400;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.m-list .row a {
+  color: inherit; text-decoration: none;
+}
+.m-list .row:hover { color: var(--accent); }
+.m-list .row:hover b { color: var(--accent); }
 
-.row { display: flex; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
-.row .stat { font-family: var(--mono); font-size: 13px; }
-.row .stat .label {
-  display: block; font-size: 9px; letter-spacing: 0.2em;
-  color: var(--text-dim); text-transform: uppercase;
+.m-thin {
+  list-style: none;
+  font-family: var(--mono); font-size: 11px;
+  display: flex; flex-direction: column; gap: 3px;
+  color: var(--text-dim);
 }
-.row .stat .value {
-  color: var(--accent); font-size: 18px;
+.m-thin li {
+  display: flex; gap: 10px; align-items: baseline;
+  cursor: pointer;
+}
+.m-thin li:hover { color: var(--accent); }
+.m-thin li .time {
+  color: var(--accent); font-size: 10px; min-width: 56px;
   text-shadow: 0 0 6px var(--accent-glow);
 }
 
-#todo-list, #schedule-list {
-  list-style: none; font-size: 13px;
+/* Channel constellations — 5 platform rows each */
+.channel-mod {
+  position: absolute;
+  padding: 8px 14px;
+  z-index: 18;
+  pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 220px;
 }
-#todo-list li, #schedule-list li {
-  padding: 6px 0; display: flex; align-items: center; gap: 10px;
-  border-bottom: 1px dashed rgba(0, 229, 255, 0.1);
-}
-#todo-list li::before {
-  content: "■"; color: var(--accent); font-size: 10px;
-}
-#todo-list li.done { color: var(--text-dim); text-decoration: line-through; }
-#todo-list li.done::before { color: var(--text-dim); }
-#schedule-list li {
-  font-family: var(--mono); font-size: 12px;
-}
-#schedule-list li .time { color: var(--accent); margin-right: 12px; }
-
-#weather-now {
-  font-family: var(--mono);
-  color: var(--text);
-}
-#weather-now .temp {
-  font-size: 32px; color: var(--accent);
-  text-shadow: 0 0 12px var(--accent-glow);
-}
-#weather-now .cond { font-size: 12px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
-
-#transcript {
-  height: 110px; overflow-y: auto;
-  font-family: var(--mono); font-size: 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent-dim) transparent;
-}
-#transcript .turn { padding: 4px 0; }
-#transcript .turn.user { color: var(--text); }
-#transcript .turn.user::before { content: "▸ "; color: var(--accent); }
-#transcript .turn.penelope { color: var(--accent); }
-#transcript .turn.penelope::before { content: "♥ "; }
-
-#boot-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+.channel-mod::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(0, 229, 255, 0.05) 0%,
+    transparent 60%
+  );
   pointer-events: none;
-  transition: opacity 600ms ease;
+  animation: aura 7s ease-in-out infinite alternate;
 }
-#boot-overlay.hidden { opacity: 0; }
-.boot-text {
-  font-family: var(--mono); font-size: 14px;
-  color: var(--accent); letter-spacing: 0.4em; text-transform: uppercase;
-  text-shadow: 0 0 12px var(--accent-glow);
-}
-
-/* canvas chart helper */
-canvas.chart { width: 100%; height: 100px; display: block; margin: 4px 0 8px; }
-
-/* Scrollbar */
-*::-webkit-scrollbar { width: 6px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb {
-  background: var(--accent-dim); border-radius: 3px;
-}
-
-/* Wizard overlay (first launch) */
-#wizard-overlay {
-  position: fixed; inset: 0; z-index: 200;
-  background: rgba(0, 0, 0, 0.92);
-  display: none; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 48px;
-}
-#wizard-overlay.visible { display: flex; }
-#wizard-overlay h1 {
-  font-family: var(--mono); letter-spacing: 0.4em;
-  color: var(--accent); font-size: 22px; margin-bottom: 36px;
-  text-shadow: 0 0 16px var(--accent-glow);
-}
-#wizard-overlay .step {
-  width: min(560px, 100%);
-  padding: 24px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-  border-radius: 8px;
-}
-#wizard-overlay input, #wizard-overlay button {
-  font-family: var(--mono); font-size: 13px;
-  background: rgba(0, 229, 255, 0.05);
-  border: 1px solid var(--panel-border);
-  color: var(--text); padding: 10px 14px;
-  border-radius: 4px; margin: 6px 0; width: 100%;
-}
-#wizard-overlay button {
-  cursor: pointer; color: var(--accent); letter-spacing: 0.2em;
+.channel-mod .ch-name {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--accent);
   text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent-glow);
+  cursor: move;
+  user-select: none;
+  border-bottom: 1px solid var(--accent-faint);
+  padding-bottom: 2px;
 }
-#wizard-overlay button:hover { background: rgba(0, 229, 255, 0.12); }
+.channel-mod .plat {
+  display: flex; justify-content: space-between; gap: 14px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.channel-mod .plat:hover { color: var(--accent); }
+.channel-mod .plat .nm {
+  letter-spacing: 0.2em; min-width: 28px;
+}
+.channel-mod .plat .vals {
+  color: var(--text);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
 
-/* ─── Invisible compose dock — the text channel underneath Penelope ──
-   Lives below her face, near-invisible at rest. Cursor blinks faintly
-   so Dylan knows he can type / paste / drag-drop links and screenshots.
-   Hover or focus brightens the line. */
+/* Resize affordance — tiny dots only visible on hover */
+.resize-handle {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 12px; height: 12px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.module:hover .resize-handle,
+.channel-mod:hover .resize-handle {
+  opacity: 0.6;
+}
+.resize-handle::before {
+  content: "";
+  position: absolute; right: 2px; bottom: 2px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Compose dock — invisible text channel below face */
 #compose-dock {
   position: absolute;
   left: 50%; transform: translateX(-50%);
-  bottom: 18%;
+  bottom: 6%;
   width: min(640px, 60vw);
-  z-index: 20;
+  z-index: 25;
   pointer-events: auto;
   display: flex; flex-direction: column; gap: 6px;
-  align-items: stretch;
 }
 #compose-thread {
   display: flex; flex-direction: column; gap: 4px;
@@ -269,7 +279,7 @@ canvas.chart { width: 100%; height: 100px; display: block; margin: 4px 0 8px; }
 #compose-thread .msg {
   padding: 6px 10px;
   border-left: 1px solid var(--accent-faint);
-  opacity: 0.78;
+  opacity: 0.85;
   word-break: break-word;
 }
 #compose-thread .msg.user { color: var(--text); }
@@ -279,8 +289,6 @@ canvas.chart { width: 100%; height: 100px; display: block; margin: 4px 0 8px; }
   text-underline-offset: 2px;
   text-decoration-color: var(--accent-faint);
 }
-#compose-thread .msg a:hover { text-decoration-color: var(--accent); }
-
 #compose-row {
   position: relative;
   display: flex; align-items: center;
@@ -288,19 +296,18 @@ canvas.chart { width: 100%; height: 100px; display: block; margin: 4px 0 8px; }
   padding: 8px 0;
   transition: border-color 0.2s ease;
 }
-#compose-row.focused,
-#compose-row.dragging {
+#compose-row.focused, #compose-row.dragging {
   border-bottom-color: var(--accent-dim);
 }
 #compose-input {
   flex: 1;
   font-family: var(--mono);
   font-size: 13px;
-  color: var(--text);
+  color: #ffffff;
   outline: none;
   min-height: 18px;
   caret-color: var(--accent);
-  opacity: 0.6;
+  opacity: 0.85;
 }
 #compose-input:focus { opacity: 1; }
 #compose-input:empty::before {
@@ -319,69 +326,24 @@ canvas.chart { width: 100%; height: 100px; display: block; margin: 4px 0 8px; }
   background: rgba(0, 229, 255, 0.05);
 }
 
-/* Detach button — tiny, almost-invisible, brightens on hover */
-button.detach {
-  background: transparent;
-  border: 0;
-  color: var(--accent);
-  opacity: 0.35;
-  font-size: 12px;
-  padding: 2px 6px;
-  margin-left: 8px;
-  cursor: pointer;
-  font-family: var(--mono);
-  transition: opacity 0.15s ease, text-shadow 0.15s ease;
-  vertical-align: middle;
+/* Boot overlay — cinematic fade-in text */
+#boot-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  transition: opacity 600ms ease;
 }
-button.detach:hover {
-  opacity: 1;
-  text-shadow: 0 0 8px var(--accent-glow);
+#boot-overlay.hidden { opacity: 0; }
+.boot-text {
+  font-family: var(--mono); font-size: 14px;
+  color: var(--accent); letter-spacing: 0.4em; text-transform: uppercase;
+  text-shadow: 0 0 12px var(--accent-glow);
 }
 
-/* Detached-window layout — single card takes the screen */
-body.detached #stage { padding: 0; }
-body.detached .card {
-  border: 1px solid var(--accent-faint);
+/* Scrollbar */
+*::-webkit-scrollbar { width: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--accent-dim); border-radius: 2px;
 }
-
-/* Compose input — pure white text on dark, blue caret */
-#compose-input { color: #ffffff; }
-
-/* Modular card layout — once Dylan drags or resizes a card,
-   it goes position:fixed and stays where he put it. */
-.card.floating {
-  position: fixed;
-  z-index: 30;
-  box-shadow: 0 6px 24px rgba(0, 229, 255, 0.06),
-              0 0 0 1px var(--accent-faint);
-}
-.card.floating > h2 { cursor: move; }
-
-/* Corner resize grip, visible only on hover */
-.resize-handle {
-  position: absolute;
-  width: 14px; height: 14px;
-  right: 0; bottom: 0;
-  cursor: nwse-resize;
-  background: linear-gradient(135deg,
-              transparent 0%, transparent 45%,
-              var(--accent-dim) 45%, var(--accent-dim) 55%,
-              transparent 55%, transparent 70%,
-              var(--accent-faint) 70%, var(--accent-faint) 80%,
-              transparent 80%);
-  opacity: 0.25;
-  transition: opacity 0.15s ease;
-}
-.card:hover .resize-handle { opacity: 0.85; }
-.card .resize-handle:hover { opacity: 1; }
-
-/* Tiny "reset layout" button in topbar — undoes everything */
-#reset-layout {
-  background: transparent; border: 0;
-  color: var(--accent); opacity: 0.3;
-  font-size: 10px; padding: 2px 8px;
-  cursor: pointer; font-family: var(--mono);
-  letter-spacing: 0.15em; text-transform: uppercase;
-  pointer-events: auto;
-}
-#reset-layout:hover { opacity: 1; }

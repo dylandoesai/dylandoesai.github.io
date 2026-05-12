@@ -1,112 +1,67 @@
-// Penelope renderer entry. Wires up the face visualizer, audio analyzer,
-// side panels, conversation transcript, and the JSON-RPC bridge to Python.
+// Penelope renderer entry — Transcendence aesthetic.
+// Every "panel" is a chrome-less floating module of glowing kinetic text.
+// All 7 channels render as their own draggable constellation showing
+// every platform's subs + 28d views.
 
 import { PenelopeFace } from './visualizer/penelope-face.js';
 import { loadFaceLandmarks } from './visualizer/face-landmarks.js';
 import { AudioAnalyzer } from './visualizer/audio-analyzer.js';
 import { runBootSequence } from './visualizer/boot-sequence.js';
-import { renderRevenue } from './panels/revenue-panel.js';
-import { renderAnalytics } from './panels/analytics-panel.js';
-import { renderSchedule } from './panels/schedule-panel.js';
 
 const $ = (id) => document.getElementById(id);
 
-const state = {
-  cfg: null,
-  face: null,
-  audio: null,
-  audioBoot: null,
-  speaking: false,
-  active: false,
+const state = { cfg: null, face: null, audio: null, speaking: false, active: false };
+const LAYOUT_KEY = 'penelope.layout.v2';
+
+const PLATFORMS = [
+  { key: 'youtube', short: 'YT', url: (h) => `https://www.youtube.com/${h || ''}` },
+  { key: 'tiktok',  short: 'TT', url: (h) => `https://www.tiktok.com/${h || ''}` },
+  { key: 'instagram', short: 'IG', url: (h) => h ? `https://www.instagram.com/${h.replace(/^@/, '')}/` : 'https://www.instagram.com/' },
+  { key: 'facebook', short: 'FB', url: (h) => h ? `https://www.facebook.com/${h.replace(/^@/, '')}/` : 'https://www.facebook.com/' },
+  { key: 'x',       short: 'X',  url: (h) => h ? `https://x.com/${h.replace(/^@/, '')}` : 'https://x.com/' },
+];
+
+const DASHBOARDS = {
+  Stripe:     'https://dashboard.stripe.com/',
+  Gumroad:    'https://app.gumroad.com/dashboard',
+  AdSense:    'https://adsense.google.com/',
+  ElevenLabs: 'https://elevenlabs.io/app/voice-lab',
 };
 
-// If we're a detached panel window (loaded with #panel=<id>), hide
-// every panel except the requested one and let it fill the screen.
-// The same renderer code runs; only the layout differs.
-function applyDetachLayout() {
-  const m = (window.location.hash || '').match(/panel=([\w-]+)/);
-  if (!m) return false;
-  const which = m[1];
-  document.body.classList.add('detached', `detached-${which}`);
-  // Hide the other surfaces
-  for (const id of ['left-panel', 'right-panel', 'bottom-panel',
-                    'topbar', 'compose-dock', 'face-canvas']) {
-    if (id === 'face-canvas') continue;  // keep face if user wants
-    if (id === which || which.startsWith(id)) continue;
-    const el = document.getElementById(id);
-    if (el && id !== `${which}-panel`) {
-      // Keep the matching aside if which='left' / 'right' / 'bottom'
-      el.style.display = (id === `${which}-panel` || id.startsWith(which)) ? '' : 'none';
-    }
-  }
-  // Show ONLY the requested card
-  const idMap = {
-    'revenue': 'revenue-card',
-    'todo': 'todo-card',
-    'yt': 'yt-card',
-    'tt': 'tt-card',
-    'schedule': 'schedule-card',
-    'weather': 'weather-card',
-    'transcript': 'transcript-card',
-  };
-  const target = document.getElementById(idMap[which] || which);
-  if (target) {
-    // hide siblings + lift target to fill
-    target.style.position = 'absolute';
-    target.style.inset = '0';
-    target.style.margin = '0';
-    target.style.padding = '32px';
-    target.style.fontSize = '120%';
-    document.body.appendChild(target);
-    // hide everything else inside main
-    for (const el of document.querySelectorAll('main > *')) {
-      if (el !== target && el.id !== 'boot-overlay' && el.id !== 'face-canvas') {
-        el.style.display = 'none';
-      }
-    }
-  }
-  return true;
-}
-
 async function boot() {
-  // Detached-panel mode: applies layout + still proceeds to render data
-  applyDetachLayout();
-
   state.cfg = (await window.penelope.readConfig('config.json')) || {};
 
-  // Load face geometry: prefer real MediaPipe JSON if extract_face_mesh.py
-  // has been run, otherwise fall back to the PC-tuned procedural mesh
-  // baked into face-landmarks.js.
+  // 3D face — same particle visualizer, less density now
   const lm = await loadFaceLandmarks();
   console.log(`face mesh: ${lm.source} (${lm.count} points)`);
-
-  // 3D face
   state.face = new PenelopeFace($('face-canvas'));
   state.face.start();
-  // boot to fully-assembled by default; we'll re-scatter and re-assemble
-  // explicitly when the wake-phrase fires.
   state.face.uniforms.uBootProgress.value = 1;
 
-  // Audio analyser drives shader reactivity from her TTS.
-  // (The wake song plays through Spotify on the system level — not
-  // routed through the renderer — so during the song the face shows
-  // its idle breathing rather than FFT-driven motion.)
   state.audio = new AudioAnalyzer($('tts-audio'));
-  function reactivityTick() {
+  (function tick() {
     state.face.setReactivity(state.audio.sample());
-    requestAnimationFrame(reactivityTick);
-  }
-  reactivityTick();
+    requestAnimationFrame(tick);
+  })();
 
   // Subscribe to Python events
   window.penelope.on('penelope:event', handlePyEvent);
 
-  // Load + render panels
-  await refreshPanels();
+  // Build channel constellations now (one floating module per brand)
+  await buildChannelConstellations();
+  // Default-position any unsaved modules so they don't pile at 0,0
+  defaultPositions();
+  // Hydrate saved positions
+  restoreLayout();
+  // Wire drag + resize on every module / channel-mod
+  for (const m of document.querySelectorAll('.module, .channel-mod')) makeMovable(m);
 
-  // Hook clock
-  tickClock();
-  setInterval(tickClock, 1000);
+  // Pull live data into modules
+  await refreshAll();
+  setInterval(refreshAll, 60000);
+
+  // Clock
+  tickClock(); setInterval(tickClock, 1000);
 
   // Cursor auto-hide
   let cursorTimer = null;
@@ -116,117 +71,303 @@ async function boot() {
     cursorTimer = setTimeout(() => document.body.classList.remove('show-cursor'), 2500);
   });
 
-  // Wire the modular drag/resize layout
-  wireLayout();
+  // Reset layout button
+  const reset = $('reset-layout');
+  if (reset) reset.addEventListener('click', () => {
+    localStorage.removeItem(LAYOUT_KEY);
+    for (const m of document.querySelectorAll('.module, .channel-mod')) {
+      m.style.left = m.style.top = m.style.width = m.style.height = '';
+    }
+    defaultPositions();
+    if (state.face?.pulse) state.face.pulse(0.5, 700);
+  });
 
-  // Wire the invisible compose dock (text channel)
   wireCompose();
 
-  // Wire the ⤢ detach buttons on every panel header
-  for (const btn of document.querySelectorAll('button.detach')) {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = btn.getAttribute('data-panel');
-      if (id && window.penelope?.detachPanel) {
-        window.penelope.detachPanel(id);
-        if (state.face?.pulse) state.face.pulse(0.4, 500);
+  // Tell Python we're ready
+  try { await window.penelope.call('start', {}); }
+  catch (e) { console.warn('python not ready:', e.message); }
+}
+
+// ── Channel constellations (one per brand, 5 platforms each) ───────────
+
+async function buildChannelConstellations() {
+  const host = $('channels-host');
+  host.innerHTML = '';
+  const chCfg = await window.penelope.readConfig('channels.json');
+  const channels = (chCfg?.channels || []);
+  for (const ch of channels) {
+    const el = document.createElement('div');
+    el.className = 'channel-mod';
+    el.id = `ch-${ch.id}`;
+    el.dataset.mod = `ch-${ch.id}`;
+    el.innerHTML = `
+      <div class="ch-name">${escapeHtml(ch.name)}</div>
+      ${PLATFORMS.map(p => {
+        const slot = (ch.platforms || {})[p.key] || {};
+        const handle = slot.handle || '';
+        const href = p.url(handle);
+        return `
+          <div class="plat" data-platform="${p.key}" data-handle="${escapeAttr(handle)}" data-href="${escapeAttr(href)}">
+            <span class="nm">${p.short}</span>
+            <span class="vals" data-vals="${p.key}-${ch.id}">— · —</span>
+          </div>`;
+      }).join('')}
+    `;
+    host.appendChild(el);
+  }
+  for (const row of host.querySelectorAll('.plat')) {
+    row.addEventListener('click', () => {
+      const href = row.dataset.href;
+      if (href && window.penelope?.openExternal) {
+        window.penelope.openExternal(href);
+        if (state.face?.pulse) state.face.pulse(0.3);
       }
     });
   }
+}
 
-  // Tell Python we're ready and let it start the hotword listener
-  try {
-    await window.penelope.call('start', {});
-  } catch (e) {
-    console.warn('python not ready:', e.message);
-    appendTranscript('penelope', '(offline — python backend not running)');
+function fillChannelData(analytics, channelsCfg) {
+  // analytics: { youtube: {channels: [...]}, tiktok: {...}, ... }
+  const byBrand = {};
+  for (const p of PLATFORMS) {
+    const bucket = (analytics?.[p.key] || {}).channels || [];
+    for (const row of bucket) {
+      const k = row.name || row.brand || '';
+      if (!byBrand[k]) byBrand[k] = {};
+      byBrand[k][p.key] = row;
+    }
+  }
+  for (const ch of (channelsCfg?.channels || [])) {
+    for (const p of PLATFORMS) {
+      const data = byBrand[ch.name]?.[p.key] || {};
+      const subs = data.subs || 0;
+      const views = data.views_28d || 0;
+      const el = document.querySelector(`[data-vals="${p.key}-${ch.id}"]`);
+      if (el) el.textContent = `${fmt(subs)} · ${fmt(views)}`;
+    }
   }
 }
 
+// ── Default positions (only used until Dylan moves things) ─────────────
+
+function defaultPositions() {
+  // Don't override anything that's been moved already
+  const map = loadLayoutMap();
+  const W = window.innerWidth, H = window.innerHeight;
+  const defaults = {
+    'm-revenue':   { left: 28,            top: 90  },
+    'm-weather':   { left: 28,            top: H - 200 },
+    'm-schedule':  { left: 28,            top: H - 360 },
+    'm-todos':     { left: W - 260,       top: H - 360 },
+  };
+  // Stack 7 channels down the right edge
+  const channels = document.querySelectorAll('.channel-mod');
+  channels.forEach((c, i) => {
+    if (!map[c.id]) {
+      c.style.left = (W - 260) + 'px';
+      c.style.top  = (90 + i * 92) + 'px';
+    }
+  });
+  for (const [id, p] of Object.entries(defaults)) {
+    if (map[id]) continue;
+    const el = document.getElementById(id);
+    if (el) { el.style.left = p.left + 'px'; el.style.top = p.top + 'px'; }
+  }
+}
+
+// ── Drag + resize + persistence ────────────────────────────────────────
+
+function loadLayoutMap() {
+  try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveLayoutMap(m) { localStorage.setItem(LAYOUT_KEY, JSON.stringify(m)); }
+function restoreLayout() {
+  const map = loadLayoutMap();
+  for (const m of document.querySelectorAll('.module, .channel-mod')) {
+    const s = map[m.id]; if (!s) continue;
+    m.style.left = s.left + 'px';
+    m.style.top = s.top + 'px';
+    if (s.width) m.style.width = s.width + 'px';
+    if (s.height) m.style.height = s.height + 'px';
+  }
+}
+function persist(m) {
+  if (!m.id) return;
+  const r = m.getBoundingClientRect();
+  const map = loadLayoutMap();
+  map[m.id] = { left: r.left|0, top: r.top|0, width: r.width|0, height: r.height|0 };
+  saveLayoutMap(map);
+}
+
+function makeMovable(m) {
+  const drag = m.querySelector('.m-label, .ch-name');
+  if (drag) drag.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const r = m.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY, sl = r.left, st = r.top;
+    m.style.zIndex = '90';
+    document.body.style.cursor = 'grabbing';
+    function move(ev) {
+      m.style.left = (sl + ev.clientX - sx) + 'px';
+      m.style.top = (st + ev.clientY - sy) + 'px';
+    }
+    function up() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.style.cursor = '';
+      persist(m);
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+
+  // SE resize handle
+  if (!m.querySelector('.resize-handle')) {
+    const h = document.createElement('div');
+    h.className = 'resize-handle';
+    m.appendChild(h);
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const r = m.getBoundingClientRect();
+      const sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
+      document.body.style.cursor = 'nwse-resize';
+      function move(ev) {
+        m.style.width = Math.max(160, sw + ev.clientX - sx) + 'px';
+        m.style.height = Math.max(60, sh + ev.clientY - sy) + 'px';
+      }
+      function up() {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        document.body.style.cursor = '';
+        persist(m);
+      }
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+  }
+}
+
+// ── Data refresh from Python sidecar ───────────────────────────────────
+
+async function refreshAll() {
+  let live = null;
+  try { live = await window.penelope.call('get_panel_data', {}); } catch {}
+  if (!live) return;
+  renderRevenue(live.revenue);
+  renderWeather(live.weather);
+  renderSchedule(live.schedule, live.todos);
+  const chCfg = await window.penelope.readConfig('channels.json');
+  fillChannelData(live.analytics || {}, chCfg);
+}
+
+function renderRevenue(rev) {
+  if (!rev) return;
+  $('rev-mtd').textContent = `$${(rev.total_mtd || 0).toFixed(2)}`;
+  const list = $('rev-sources'); list.innerHTML = '';
+  for (const s of (rev.sources || [])) {
+    const url = DASHBOARDS[s.name];
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span>${escapeHtml(s.name)}</span><b>$${(s.mtd || 0).toFixed(2)}</b>`;
+    if (url) {
+      row.style.cursor = 'pointer';
+      row.onclick = () => {
+        if (window.penelope?.openExternal) window.penelope.openExternal(url);
+        if (state.face?.pulse) state.face.pulse(0.3);
+      };
+    }
+    list.appendChild(row);
+  }
+}
+
+function renderWeather(wx) {
+  if (!wx) return;
+  const t = wx.temp_f ?? wx.temperature_f ?? '—';
+  const c = wx.condition || wx.source || '';
+  $('wx-temp').textContent = `${t}°`;
+  $('wx-cond').textContent = c + (wx.city ? ` · ${wx.city}` : '');
+  const card = $('m-weather');
+  card.style.cursor = 'pointer';
+  card.onclick = (e) => {
+    if (e.target.closest('.resize-handle, .m-label')) return;
+    if (window.penelope?.openExternal) window.penelope.openExternal('weather://');
+    if (state.face?.pulse) state.face.pulse(0.3);
+  };
+}
+
+function renderSchedule(schedule, todos) {
+  const s = $('sched-list'); s.innerHTML = '';
+  for (const e of ((schedule || {}).events || []).slice(0, 6)) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="time">${escapeHtml(e.time || '')}</span>${escapeHtml(e.title || '')}`;
+    li.onclick = () => window.penelope?.openExternal?.('ical://');
+    s.appendChild(li);
+  }
+  if (!s.childElementCount) {
+    const li = document.createElement('li');
+    li.style.opacity = '0.4';
+    li.textContent = 'nothing scheduled';
+    li.onclick = () => window.penelope?.openExternal?.('ical://');
+    s.appendChild(li);
+  }
+  const t = $('todo-list'); t.innerHTML = '';
+  for (const it of ((todos || {}).items || []).slice(0, 8)) {
+    const li = document.createElement('li');
+    li.textContent = it.text || '';
+    li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
+    t.appendChild(li);
+  }
+  if (!t.childElementCount) {
+    const li = document.createElement('li');
+    li.style.opacity = '0.4';
+    li.textContent = 'no reminders due today';
+    li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
+    t.appendChild(li);
+  }
+}
+
+// ── Python event dispatch ──────────────────────────────────────────────
+
 function handlePyEvent(evt) {
   switch (evt.event) {
-    case 'log':
-      console.log('[py]', evt.data);
-      break;
-    case 'hotword':
-      handleWake(evt.data);
-      break;
-    case 'go_sleep':
-      handleSleep();
-      break;
-    case 'user_transcript':
-      appendTranscript('user', evt.data.text);
-      break;
-    case 'assistant_text':
-      appendTranscript('penelope', evt.data.text);
-      break;
-    case 'assistant_audio':
-      playTts(evt.data.url, evt.data.visemes || []);
-      break;
-    case 'assistant_thinking':
-      $('status-text').textContent = 'thinking';
-      break;
+    case 'log': console.log('[py]', evt.data); break;
+    case 'hotword': handleWake(evt.data); break;
+    case 'go_sleep': handleSleep(); break;
+    case 'user_transcript': appendThread('user', evt.data.text); break;
+    case 'assistant_text': appendThread('penelope', evt.data.text); break;
+    case 'assistant_audio': playTts(evt.data.url, evt.data.visemes || []); break;
+    case 'assistant_thinking': $('status-text').textContent = 'thinking'; break;
     case 'assistant_idle':
       $('status-text').textContent = 'listening';
-      state.face.setIdle();
-      break;
-    case 'face_seen':
-      // Webcam saw owner — no automatic wake (user requested wake-words only).
+      state.face?.setIdle();
       break;
     case 'mode_changed':
-      if (state.face && typeof state.face.setMode === 'function') {
-        state.face.setMode(evt.data.mode);
-      }
-      break;
-    case 'proactive_alert':
-      handleAlert(evt.data);
-      break;
-    case 'data_updated':
-      refreshPanels();
-      break;
-    case 'python_exit':
-      $('status-text').textContent = 'offline';
-      break;
+      state.face?.setMode?.(evt.data.mode); break;
+    case 'data_updated': refreshAll(); break;
   }
 }
 
 async function handleWake(data) {
-  const phrase = data.phrase || 'papis_home';
-  const isFullWake = phrase === 'papis_home';
-
-  if (data.already_active) {
-    // small flourish, no song, no greeting
-    state.face.bootAssemble(1500);
-    return;
-  }
+  const phrase = data?.phrase || 'papis_home';
+  const isFull = phrase === 'papis_home';
+  if (data?.already_active) { state.face?.bootAssemble?.(1500); return; }
   state.active = true;
-
-  // Scatter face for the assembly
   state.face.uniforms.uBootProgress.value = 0;
-
-  // Full wake -> tell Python to start the wake song in Spotify
-  if (isFullWake) {
-    try { await window.penelope.call('play_wake_song', {}); } catch (e) {
-      console.warn('wake song failed', e);
-    }
+  if (isFull) {
+    try { await window.penelope.call('play_wake_song', {}); } catch {}
   }
-
-  // Kick off fresh panel data fetch in parallel with the boot animation
-  // so panels show LIVE numbers the moment they slide in (not stale JSON).
-  refreshPanels().catch(e => console.warn('panel refresh failed', e));
-
-  const panels = [$('left-panel'), $('right-panel'), $('bottom-panel')];
+  refreshAll().catch(() => {});
   await runBootSequence({
     face: state.face,
-    panels,
+    panels: [...document.querySelectorAll('.module, .channel-mod')],
     bootEl: $('boot-overlay'),
     statusEl: $('status-text'),
-    duration: isFullWake ? 12000 : 2500,
-    quick: !isFullWake,
+    duration: isFull ? 12000 : 2500,
+    quick: !isFull,
   });
-
-  if (isFullWake) {
-    // Fade Spotify down so the greeting is audible, then deliver brief
+  if (isFull) {
     try { await window.penelope.call('stop_wake_song', {}); } catch {}
     await window.penelope.call('daily_brief', {});
   } else {
@@ -237,113 +378,115 @@ async function handleWake(data) {
 function handleSleep() {
   state.active = false;
   $('status-text').textContent = 'standby';
-  // Re-scatter the face so the next wake is dramatic
   state.face.uniforms.uBootProgress.value = 0;
-  state.face.setIdle();
-  // Main process hides the window in response to the go_sleep event.
+  state.face?.setIdle();
 }
 
-function appendTranscript(who, text) {
-  const t = $('transcript');
-  const div = document.createElement('div');
-  div.className = `turn ${who}`;
-  div.textContent = text;
-  t.appendChild(div);
-  while (t.childElementCount > 60) t.removeChild(t.firstChild);
-  t.scrollTop = t.scrollHeight;
+// ── Compose ─────────────────────────────────────────────────────────────
+
+function wireCompose() {
+  const input = $('compose-input');
+  const row = $('compose-row');
+  const thread = $('compose-thread');
+  const attRow = $('compose-attachments');
+  if (!input) return;
+  const pending = [];
+
+  function appendThread(role, html) {
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerHTML = html;
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+    if (state.face?.pulse) state.face.pulse(0.25, 400);
+  }
+  window.penelopeCompose = { appendThread };
+
+  async function fileToB64(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = String(r.result), i = s.indexOf(',');
+        res(i >= 0 ? s.slice(i + 1) : s);
+      };
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
+  async function ingestFile(file) {
+    try {
+      const b64 = await fileToB64(file);
+      pending.push({ name: file.name, mime: file.type || 'application/octet-stream', b64 });
+      const chip = document.createElement('span');
+      chip.className = 'att';
+      chip.textContent = (file.type?.startsWith('image/') ? '🖼 ' : '📎 ') + file.name;
+      attRow.appendChild(chip);
+    } catch {}
+  }
+
+  document.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('dragging'); });
+  document.addEventListener('dragleave', () => row.classList.remove('dragging'));
+  document.addEventListener('drop', async (e) => {
+    e.preventDefault(); row.classList.remove('dragging');
+    for (const f of (e.dataTransfer?.files || [])) await ingestFile(f);
+    input.focus();
+  });
+  input.addEventListener('paste', async (e) => {
+    for (const it of (e.clipboardData?.items || [])) {
+      if (it.kind === 'file') { e.preventDefault(); await ingestFile(it.getAsFile()); }
+    }
+  });
+  input.addEventListener('focus', () => row.classList.add('focused'));
+  input.addEventListener('blur', () => row.classList.remove('focused'));
+  input.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    const text = input.innerText.trim();
+    const atts = pending.splice(0);
+    attRow.innerHTML = '';
+    input.innerText = '';
+    if (!text && !atts.length) return;
+    appendThread('user', escapeHtml(text || '(attachment)') +
+      (atts.length ? ` <span style="opacity:.5">[+${atts.length}]</span>` : ''));
+    try {
+      const r = await window.penelope.call('text_message', { text, attachments: atts });
+      if (r?.links?.length) for (const l of r.links)
+        appendThread('penelope', `<a href="${escapeAttr(l.url)}" target="_blank">${escapeHtml(l.label || l.url)}</a>`);
+      if (r?.text) appendThread('penelope', escapeHtml(r.text));
+    } catch (e) {
+      appendThread('penelope', `<i style="color:#f66">${escapeHtml(String(e.message || e))}</i>`);
+    }
+  });
+}
+
+function appendThread(role, text) {
+  if (window.penelopeCompose) window.penelopeCompose.appendThread(role, escapeHtml(text));
 }
 
 async function playTts(url, visemes) {
   const a = $('tts-audio');
   a.src = url;
-  state.face.setIdle();
+  state.face?.setIdle();
   state.speaking = true;
   $('status-text').textContent = 'speaking';
-  if (visemes && visemes.length) scheduleVisemes(visemes, a);
+  if (visemes?.length) scheduleVisemes(visemes, a);
   try { await a.play(); } catch (e) { console.warn(e); }
   a.onended = () => {
     state.speaking = false;
-    state.face.setIdle();
+    state.face?.setIdle();
     $('status-text').textContent = 'listening';
   };
 }
-
 function scheduleVisemes(visemes, audioEl) {
-  // visemes: [{t: seconds, open: 0..1, wide: -1..1}, ...]
   let idx = 0;
-  const step = () => {
+  function step() {
     if (audioEl.paused || audioEl.ended) return;
     const t = audioEl.currentTime;
     while (idx < visemes.length - 1 && visemes[idx + 1].t <= t) idx++;
-    const cur = visemes[idx];
-    state.face.setViseme({ open: cur.open, wide: cur.wide });
+    state.face?.setViseme({ open: visemes[idx].open, wide: visemes[idx].wide });
     requestAnimationFrame(step);
-  };
+  }
   step();
-}
-
-// Weather widget is rendered into #weather-now by refreshPanels; clicking
-// pulses the face and opens Apple's Weather.app (weather:// scheme).
-async function refreshWeatherWidget(weatherEvt) {
-  const el = document.getElementById('weather-now');
-  if (!el || !weatherEvt) return;
-  const t = weatherEvt.temp_f ?? weatherEvt.temperature_f ?? '?';
-  const c = weatherEvt.condition || weatherEvt.source || '';
-  const src = weatherEvt.source ? ` · ${weatherEvt.source}` : '';
-  el.innerHTML = `<div class="big">${t}°F</div><div>${c}${src}</div>`;
-  el.style.cursor = 'pointer';
-  el.title = 'Open Weather.app';
-  el.onclick = () => {
-    if (state.face && state.face.pulse) state.face.pulse(0.35);
-    if (window.penelope?.openExternal) window.penelope.openExternal('weather://');
-  };
-}
-
-async function refreshPanels() {
-  // Prefer LIVE data from the Python sidecar (brain.gather_revenue +
-  // gather_analytics + apple_cal.today_events + apple_reminders.scheduled_today).
-  // Fall back to the static JSON files if the bridge isn't ready (boot,
-  // first render before start() returns).
-  let revenue, analytics, schedule, todos, weather;
-  try {
-    const live = await window.penelope.call('get_panel_data', {});
-    if (live) {
-      revenue = live.revenue;
-      analytics = live.analytics;
-      schedule = live.schedule;
-      todos = live.todos;
-      weather = live.weather;
-    }
-  } catch (e) {
-    console.warn('panel live-data failed, falling back to JSON', e);
-  }
-  if (!revenue)   revenue   = await window.penelope.readConfig('revenue.json');
-  if (!analytics) analytics = await window.penelope.readConfig('analytics.json');
-  if (!schedule)  schedule  = await window.penelope.readConfig('schedule.json');
-  if (!todos)     todos     = await window.penelope.readConfig('todos.json');
-
-  if (revenue) renderRevenue(revenue);
-  if (analytics) renderAnalytics(analytics);
-  if (schedule || todos) renderSchedule(schedule || { events: [] }, todos || { items: [] });
-  if (weather) refreshWeatherWidget(weather);
-}
-
-function handleAlert(alert) {
-  // user spec: all-three (chime + visual pulse + voice).
-  // chime + voice are handled python-side; here we do the visual pulse.
-  const targetId = alert.panel ? `${alert.panel}-card` : null;
-  const el = targetId ? document.getElementById(targetId) : null;
-  if (el) {
-    el.animate(
-      [
-        { boxShadow: '0 0 0 1px rgba(0,229,255,0.06) inset, 0 0 24px rgba(0,229,255,0.07)' },
-        { boxShadow: '0 0 0 2px rgba(0,229,255,0.6) inset, 0 0 60px rgba(0,229,255,0.8)' },
-        { boxShadow: '0 0 0 1px rgba(0,229,255,0.06) inset, 0 0 24px rgba(0,229,255,0.07)' },
-      ],
-      { duration: 1400, iterations: 1 },
-    );
-  }
-  if (alert.text) appendTranscript('penelope', alert.text);
 }
 
 function tickClock() {
@@ -355,263 +498,25 @@ function tickClock() {
   $('clock').textContent = `${hh}:${mm}:${ss} ${ampm}`;
 }
 
-// ─── Modular floating-card layout ──
-// Every .card can be dragged by its <h2> header to anywhere on screen,
-// resized by the SE corner grip, and its position+size persists across
-// runs in localStorage. Multiple panels can sit on one screen.
-// Reset layout button in the topbar wipes the saved state.
-
-const LAYOUT_KEY = 'penelope.layout.v1';
-
-function loadLayoutMap() {
-  try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); }
-  catch { return {}; }
+function fmt(n) {
+  if (!n) return '0';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n | 0);
 }
-function saveLayoutMap(m) { localStorage.setItem(LAYOUT_KEY, JSON.stringify(m)); }
-
-function liftCardToFloating(card) {
-  if (card.classList.contains('floating')) return;
-  const r = card.getBoundingClientRect();
-  card.classList.add('floating');
-  card.style.left = r.left + 'px';
-  card.style.top = r.top + 'px';
-  card.style.width = r.width + 'px';
-  card.style.height = r.height + 'px';
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
 
-function restoreLayout() {
-  const map = loadLayoutMap();
-  for (const card of document.querySelectorAll('.card')) {
-    const id = card.id;
-    if (!id || !map[id]) continue;
-    const s = map[id];
-    card.classList.add('floating');
-    card.style.left = s.left + 'px';
-    card.style.top = s.top + 'px';
-    card.style.width = s.width + 'px';
-    card.style.height = s.height + 'px';
-  }
-}
-
-function persistCard(card) {
-  if (!card.id) return;
-  const r = card.getBoundingClientRect();
-  const map = loadLayoutMap();
-  map[card.id] = {
-    left: r.left | 0, top: r.top | 0,
-    width: r.width | 0, height: r.height | 0,
-  };
-  saveLayoutMap(map);
-}
-
-function makeMovable(card) {
-  const header = card.querySelector('h2');
-  if (!header) return;
-  header.addEventListener('pointerdown', (e) => {
-    if (e.target.tagName === 'BUTTON') return;  // ignore ⤢ click
-    e.preventDefault();
-    liftCardToFloating(card);
-    const startX = e.clientX, startY = e.clientY;
-    const r = card.getBoundingClientRect();
-    const startLeft = r.left, startTop = r.top;
-    card.style.zIndex = '90';
-    document.body.style.cursor = 'grabbing';
-    function move(ev) {
-      card.style.left = (startLeft + ev.clientX - startX) + 'px';
-      card.style.top = (startTop + ev.clientY - startY) + 'px';
-    }
-    function up() {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      document.body.style.cursor = '';
-      persistCard(card);
-    }
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  });
-
-  // Resize handle in the SE corner
-  if (!card.querySelector('.resize-handle')) {
-    const h = document.createElement('div');
-    h.className = 'resize-handle';
-    card.appendChild(h);
-    h.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      liftCardToFloating(card);
-      const startX = e.clientX, startY = e.clientY;
-      const r = card.getBoundingClientRect();
-      const sw = r.width, sh = r.height;
-      document.body.style.cursor = 'nwse-resize';
-      function move(ev) {
-        card.style.width = Math.max(220, sw + ev.clientX - startX) + 'px';
-        card.style.height = Math.max(120, sh + ev.clientY - startY) + 'px';
-      }
-      function up() {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        document.body.style.cursor = '';
-        persistCard(card);
-      }
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-    });
-  }
-}
-
-function wireLayout() {
-  restoreLayout();
-  for (const card of document.querySelectorAll('.card')) {
-    makeMovable(card);
-  }
-  const reset = document.getElementById('reset-layout');
-  if (reset) {
-    reset.addEventListener('click', () => {
-      localStorage.removeItem(LAYOUT_KEY);
-      for (const card of document.querySelectorAll('.card.floating')) {
-        card.classList.remove('floating');
-        card.style.left = card.style.top = card.style.width = card.style.height = '';
-        card.style.zIndex = '';
-      }
-      if (state.face?.pulse) state.face.pulse(0.5, 700);
-    });
-  }
-}
-
-
-// ─── Compose dock — the invisible text channel under Penelope ──
-// Type text + paste/drag-drop images, screenshots, files, or links.
-// Penelope's verbal reply still speaks via TTS; any links / long text
-// she returns are appended to #compose-thread above the input.
-
-function wireCompose() {
-  const input = document.getElementById('compose-input');
-  const row = document.getElementById('compose-row');
-  const thread = document.getElementById('compose-thread');
-  const attRow = document.getElementById('compose-attachments');
-  if (!input || !row) return;
-
-  const pending = [];   // [{name, mime, b64}]
-
-  function addAttachmentChip(name, mime) {
-    const chip = document.createElement('span');
-    chip.className = 'att';
-    chip.textContent = (mime?.startsWith('image/') ? '🖼 ' : '📎 ') + name;
-    attRow.appendChild(chip);
-  }
-
-  function appendThread(role, html) {
-    const div = document.createElement('div');
-    div.className = `msg ${role}`;
-    div.innerHTML = html;
-    thread.appendChild(div);
-    thread.scrollTop = thread.scrollHeight;
-    // particle pulse so the face acknowledges the new message
-    if (state.face?.pulse) state.face.pulse(0.25, 400);
-  }
-  // Expose so brain events can write into the thread
-  window.penelopeCompose = { appendThread };
-
-  async function fileToB64(file) {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => {
-        const s = r.result;
-        const idx = String(s).indexOf(',');
-        resolve(idx >= 0 ? String(s).slice(idx + 1) : String(s));
-      };
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
-  }
-
-  async function ingestFile(file) {
-    try {
-      const b64 = await fileToB64(file);
-      pending.push({ name: file.name, mime: file.type || 'application/octet-stream', b64 });
-      addAttachmentChip(file.name, file.type);
-    } catch (e) { console.warn('attach failed', e); }
-  }
-
-  // Drag-drop anywhere on the body lights up the compose row
-  document.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('dragging'); });
-  document.addEventListener('dragleave', () => row.classList.remove('dragging'));
-  document.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    row.classList.remove('dragging');
-    for (const f of (e.dataTransfer?.files || [])) await ingestFile(f);
-    input.focus();
-  });
-
-  // Cmd+V paste: image OR text
-  input.addEventListener('paste', async (e) => {
-    const items = e.clipboardData?.items || [];
-    for (const it of items) {
-      if (it.kind === 'file') {
-        const f = it.getAsFile();
-        if (f) {
-          e.preventDefault();
-          await ingestFile(f);
-        }
-      }
-    }
-  });
-
-  input.addEventListener('focus', () => row.classList.add('focused'));
-  input.addEventListener('blur', () => row.classList.remove('focused'));
-
-  // Enter sends, Shift+Enter newline
-  input.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const text = input.innerText.trim();
-      const atts = pending.splice(0);
-      attRow.innerHTML = '';
-      input.innerText = '';
-      if (!text && !atts.length) return;
-      const echoText = text || '(attachment)';
-      const attLabel = atts.length ? ` <span style="opacity:.5">[+${atts.length} file${atts.length>1?'s':''}]</span>` : '';
-      appendThread('user', escapeHtmlSafe(echoText) + attLabel);
-      try {
-        const reply = await window.penelope.call('text_message',
-          { text, attachments: atts });
-        // Penelope speaks via the normal assistant_audio/text event path;
-        // here we render any utility links/text she returned.
-        if (reply?.links?.length) {
-          for (const l of reply.links) {
-            appendThread('penelope',
-              `<a href="${escapeAttr(l.url)}" target="_blank">${escapeHtmlSafe(l.label || l.url)}</a>`);
-          }
-        }
-        if (reply?.text) appendThread('penelope', escapeHtmlSafe(reply.text));
-      } catch (err) {
-        appendThread('penelope', `<i style="color:#f66">${escapeHtmlSafe(String(err.message || err))}</i>`);
-      }
-    }
-  });
-}
-
-function escapeHtmlSafe(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-function escapeAttr(s) { return escapeHtmlSafe(s).replace(/'/g, '&#39;'); }
-
-
-// Devtools + interactive helpers used by clickable panels.
 window.penelopeDev = {
-  reloadData: refreshPanels,
+  reloadData: refreshAll,
   fakeWake: () => handleWake({}),
   scatter: () => { state.face.uniforms.uBootProgress.value = 0; },
-  // Brief particle pulse triggered when Dylan clicks a panel surface.
-  pulse: (strength = 0.35) => {
-    if (state.face && typeof state.face.pulse === 'function') {
-      state.face.pulse(strength);
-    }
-  },
+  pulse: (s = 0.35) => state.face?.pulse?.(s),
 };
 
-boot().catch(e => {
+boot().catch((e) => {
   console.error('boot failed', e);
   document.body.innerHTML = `<pre style="color:#0ff;padding:24px">${e.stack}</pre>`;
 });
