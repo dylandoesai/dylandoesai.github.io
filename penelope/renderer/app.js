@@ -6,6 +6,7 @@
 import { PenelopeFace } from './visualizer/penelope-face.js';
 import { AudioAnalyzer } from './visualizer/audio-analyzer.js';
 import { runBootSequence } from './visualizer/boot-sequence.js';
+import { bigNumber, smallNumber, barChart, sparkline } from './visualizer/particle-graph.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -98,27 +99,22 @@ async function buildChannelConstellations() {
     el.className = 'channel-mod';
     el.id = `ch-${ch.id}`;
     el.dataset.mod = `ch-${ch.id}`;
+    el.dataset.handles = JSON.stringify(
+      Object.fromEntries(PLATFORMS.map(p => [p.key, ((ch.platforms || {})[p.key] || {}).handle || '']))
+    );
+    // Each channel: name + a 5-bar particle chart (one bar per platform)
     el.innerHTML = `
       <div class="ch-name">${escapeHtml(ch.name)}</div>
-      ${PLATFORMS.map(p => {
-        const slot = (ch.platforms || {})[p.key] || {};
-        const handle = slot.handle || '';
-        const href = p.url(handle);
-        return `
-          <div class="plat" data-platform="${p.key}" data-handle="${escapeAttr(handle)}" data-href="${escapeAttr(href)}">
-            <span class="nm">${p.short}</span>
-            <span class="vals" data-vals="${p.key}-${ch.id}">— · —</span>
-          </div>`;
-      }).join('')}
+      <canvas class="ch-chart" data-ch="${ch.id}" width="220" height="32"></canvas>
     `;
     host.appendChild(el);
   }
-  for (const row of host.querySelectorAll('.plat')) {
-    row.addEventListener('click', () => {
-      const href = row.dataset.href;
-      if (href && window.penelope?.openExternal) {
-        window.penelope.openExternal(href);
-        if (state.face?.pulse) state.face.pulse(0.3);
+  // Click a channel's chart → opens upload-post analytics for that user
+  for (const c of host.querySelectorAll('.ch-chart')) {
+    c.addEventListener('click', () => {
+      if (window.penelope?.openExternal) {
+        window.penelope.openExternal('https://app.upload-post.com/analytics');
+        state.face?.pulse?.(0.3);
       }
     });
   }
@@ -136,13 +132,10 @@ function fillChannelData(analytics, channelsCfg) {
     }
   }
   for (const ch of (channelsCfg?.channels || [])) {
-    for (const p of PLATFORMS) {
-      const data = byBrand[ch.name]?.[p.key] || {};
-      const subs = data.subs || 0;
-      const views = data.views_28d || 0;
-      const el = document.querySelector(`[data-vals="${p.key}-${ch.id}"]`);
-      if (el) el.textContent = `${fmt(subs)} · ${fmt(views)}`;
-    }
+    // Build a 5-element vector — one bar per platform, value = 28d views
+    const vals = PLATFORMS.map(p => byBrand[ch.name]?.[p.key]?.views_28d || 0);
+    const canvas = document.querySelector(`.ch-chart[data-ch="${ch.id}"]`);
+    if (canvas) barChart(canvas, vals);
   }
 }
 
@@ -261,68 +254,52 @@ async function refreshAll() {
 
 function renderRevenue(rev) {
   if (!rev) return;
-  $('rev-mtd').textContent = `$${(rev.total_mtd || 0).toFixed(2)}`;
-  const list = $('rev-sources'); list.innerHTML = '';
-  for (const s of (rev.sources || [])) {
-    const url = DASHBOARDS[s.name];
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<span>${escapeHtml(s.name)}</span><b>$${(s.mtd || 0).toFixed(2)}</b>`;
-    if (url) {
-      row.style.cursor = 'pointer';
-      row.onclick = () => {
-        if (window.penelope?.openExternal) window.penelope.openExternal(url);
-        if (state.face?.pulse) state.face.pulse(0.3);
-      };
-    }
-    list.appendChild(row);
+  // Big number in particles
+  bigNumber($('rev-big'), `$${(rev.total_mtd || 0).toFixed(2)}`);
+  // Source breakdown as a particle bar chart
+  const sources = (rev.sources || []).filter(s => s.name);
+  const vals = sources.map(s => Math.max(0, s.mtd || 0));
+  barChart($('rev-chart'), vals);
+  // Click → open Stripe Express where ElevenLabs / Gumroad land
+  for (const c of [$('rev-big'), $('rev-chart')]) {
+    c.onclick = () => {
+      window.penelope?.openExternal?.('https://connect.stripe.com/express_login');
+      state.face?.pulse?.(0.3);
+    };
   }
 }
 
 function renderWeather(wx) {
   if (!wx) return;
   const t = wx.temp_f ?? wx.temperature_f ?? '—';
-  const c = wx.condition || wx.source || '';
-  $('wx-temp').textContent = `${t}°`;
-  $('wx-cond').textContent = c + (wx.city ? ` · ${wx.city}` : '');
-  const card = $('m-weather');
-  card.style.cursor = 'pointer';
-  card.onclick = (e) => {
-    if (e.target.closest('.resize-handle, .m-label')) return;
-    if (window.penelope?.openExternal) window.penelope.openExternal('weather://');
-    if (state.face?.pulse) state.face.pulse(0.3);
+  const c = wx.condition || '';
+  const city = wx.city ? ` · ${wx.city.toUpperCase()}` : '';
+  $('wx-label').textContent = `WEATHER${city}${c ? ' · ' + c.toUpperCase() : ''}`;
+  bigNumber($('wx-temp'), `${t}°`);
+  $('wx-temp').onclick = () => {
+    window.penelope?.openExternal?.('weather://');
+    state.face?.pulse?.(0.3);
   };
 }
 
 function renderSchedule(schedule, todos) {
-  const s = $('sched-list'); s.innerHTML = '';
-  for (const e of ((schedule || {}).events || []).slice(0, 6)) {
-    const li = document.createElement('li');
-    li.innerHTML = `<span class="time">${escapeHtml(e.time || '')}</span>${escapeHtml(e.title || '')}`;
-    li.onclick = () => window.penelope?.openExternal?.('ical://');
-    s.appendChild(li);
-  }
-  if (!s.childElementCount) {
-    const li = document.createElement('li');
-    li.style.opacity = '0.4';
-    li.textContent = 'nothing scheduled';
-    li.onclick = () => window.penelope?.openExternal?.('ical://');
-    s.appendChild(li);
-  }
-  const t = $('todo-list'); t.innerHTML = '';
-  for (const it of ((todos || {}).items || []).slice(0, 8)) {
-    const li = document.createElement('li');
-    li.textContent = it.text || '';
-    li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
-    t.appendChild(li);
-  }
-  if (!t.childElementCount) {
-    const li = document.createElement('li');
-    li.style.opacity = '0.4';
-    li.textContent = 'no reminders due today';
-    li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
-    t.appendChild(li);
-  }
+  // Schedule → bar chart with one bar per event (each bar height = duration
+  // or just constant). Empty → empty chart.
+  const events = (schedule?.events || []).slice(0, 6);
+  const vals = events.length ? events.map(() => 1) : [0];
+  barChart($('sched-graph'), vals);
+  $('sched-graph').onclick = () => {
+    window.penelope?.openExternal?.('ical://');
+    state.face?.pulse?.(0.3);
+  };
+
+  const items = (todos?.items || []).slice(0, 8);
+  const tvals = items.length ? items.map((_, i) => items.length - i) : [0];
+  barChart($('todo-graph'), tvals);
+  $('todo-graph').onclick = () => {
+    window.penelope?.openExternal?.('x-apple-reminderkit://');
+    state.face?.pulse?.(0.3);
+  };
 }
 
 // ── Python event dispatch ──────────────────────────────────────────────

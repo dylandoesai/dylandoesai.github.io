@@ -347,3 +347,20 @@ body.show-cursor { cursor: default; }
 *::-webkit-scrollbar-thumb {
   background: var(--accent-dim); border-radius: 2px;
 }
+
+/* Particle-canvas graphs inside modules — same cyan material as the face */
+.m-canvas {
+  display: block;
+  width: 240px;
+  height: 56px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.m-canvas.chart { height: 64px; margin-top: 2px; }
+.m-canvas.tall  { height: 80px; }
+
+.channel-mod .ch-chart {
+  display: block;
+  width: 220px; height: 32px;
+  cursor: pointer;
+}

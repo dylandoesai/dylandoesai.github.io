@@ -27,26 +27,27 @@
          just glowing kinetic text. No borders, no backdrops, no boxes.
          Each is grabbable and movable to anywhere on screen.            -->
 
+    <!-- Every module is title + particle-rendered graph. All drawn in
+         the same cyan-additive material as her face. Same drag/resize. -->
     <div class="module" id="m-revenue" data-mod="revenue">
       <div class="m-label">REVENUE · MTD</div>
-      <div class="m-big" id="rev-mtd">—</div>
-      <div class="m-list" id="rev-sources"></div>
+      <canvas class="m-canvas" id="rev-big" width="220" height="46"></canvas>
+      <canvas class="m-canvas chart" id="rev-chart" width="240" height="64"></canvas>
     </div>
 
     <div class="module" id="m-weather" data-mod="weather">
-      <div class="m-label">WEATHER</div>
-      <div class="m-big" id="wx-temp">—</div>
-      <div class="m-sub" id="wx-cond"></div>
+      <div class="m-label" id="wx-label">WEATHER</div>
+      <canvas class="m-canvas" id="wx-temp" width="200" height="56"></canvas>
     </div>
 
     <div class="module" id="m-schedule" data-mod="schedule">
       <div class="m-label">TODAY</div>
-      <ul class="m-thin" id="sched-list"></ul>
+      <canvas class="m-canvas tall" id="sched-graph" width="240" height="80"></canvas>
     </div>
 
     <div class="module" id="m-todos" data-mod="todos">
       <div class="m-label">REMINDERS</div>
-      <ul class="m-thin" id="todo-list"></ul>
+      <canvas class="m-canvas tall" id="todo-graph" width="240" height="80"></canvas>
     </div>
 
     <!-- One floating constellation per brand. Each lists ALL 5 platforms
