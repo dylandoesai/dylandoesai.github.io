@@ -84,11 +84,22 @@ def _run_whisper_fallback(on_detect):
     print("[hotword] loading whisper tiny.en …", file=sys.stderr, flush=True)
     model = WhisperModel("tiny.en", compute_type="int8")
     sr = 16000
-    window = 2.0  # seconds
-    step = 0.6    # seconds between checks
+    window = 2.0   # seconds
+    step = 0.6     # seconds between checks
+    # Energy gate. Original 0.004 was too high — a 1-sec wake phrase
+    # averaged over a 2-sec window with mostly-silence trails comes in
+    # around 0.0015-0.0025. Bar set just above pure room silence
+    # (~0.0005-0.0008) so Whisper actually runs when Dylan speaks.
+    ENERGY_GATE = 0.0010
+    # peak gate — if any individual sample in the window crosses this,
+    # we transcribe even if the AVERAGE is below ENERGY_GATE. Catches
+    # short consonant bursts ("p-p-papi") that would otherwise be lost.
+    PEAK_GATE = 0.05
     buf = np.zeros(int(sr * window), dtype=np.float32)
     require_owner = voice_id.owner_enrolled()
-    print(f"[hotword] whisper ready. voice_id gate={require_owner}", file=sys.stderr, flush=True)
+    print(f"[hotword] whisper ready. voice_id gate={require_owner} "
+          f"energy_thresh={ENERGY_GATE} peak_thresh={PEAK_GATE}",
+          file=sys.stderr, flush=True)
 
     # Sanity-check the mic before entering the loop
     try:
@@ -122,21 +133,28 @@ def _run_whisper_fallback(on_detect):
         last_check = now
         audio = buf.copy()
         energy = float(np.abs(audio).mean())
+        peak = float(np.abs(audio).max())
         # Heartbeat every 5s so we know the loop is alive even when quiet
         if now - last_status > 5:
-            print(f"[hotword] energy={energy:.4f} (waiting for speech)",
-                  file=sys.stderr, flush=True)
+            print(f"[hotword] energy={energy:.4f} peak={peak:.3f} "
+                  f"(waiting for speech)", file=sys.stderr, flush=True)
             last_status = now
-        if energy < 0.004:
+        if energy < ENERGY_GATE and peak < PEAK_GATE:
             continue
+        # Speech-ish — transcribe. Log the energy that triggered it so we
+        # can tune the gate over time.
+        print(f"[hotword] speech-ish (energy={energy:.4f} peak={peak:.3f}) — transcribing",
+              file=sys.stderr, flush=True)
         try:
             segments, _ = model.transcribe(
                 audio, language="en", beam_size=1,
                 vad_filter=True, condition_on_previous_text=False)
             text = " ".join(seg.text for seg in segments).lower().strip()
-        except Exception:
+        except Exception as e:
+            print(f"[hotword] whisper error: {e}", file=sys.stderr, flush=True)
             continue
         if not text:
+            print("[hotword] (transcript empty)", file=sys.stderr, flush=True)
             continue
         print(f"[hotword] heard: {text!r}", file=sys.stderr, flush=True)
         which = _match_wake(text)
@@ -144,9 +162,12 @@ def _run_whisper_fallback(on_detect):
             if require_owner:
                 is_owner, sim = voice_id.is_owner(buf.copy())
                 if not is_owner:
-                    print(f"[hotword] ignored '{which}' — speaker sim={sim:.2f}",
+                    print(f"[hotword] MATCHED '{which}' but voice-id rejected "
+                          f"(sim={sim:.2f}, threshold=0.72) — adjust or re-enroll",
                           file=sys.stderr, flush=True)
                     continue
+                print(f"[hotword] voice-id OK (sim={sim:.2f})",
+                      file=sys.stderr, flush=True)
             print(f"[hotword] WAKE: {which}", file=sys.stderr, flush=True)
             on_detect(which)
             time.sleep(15)

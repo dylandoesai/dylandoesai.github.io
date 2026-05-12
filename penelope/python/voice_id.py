@@ -29,7 +29,12 @@ ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
 EMB_PATH = ASSETS / "owner_voice.npy"
 META_PATH = ASSETS / "owner_voice_meta.json"
-DEFAULT_THRESHOLD = 0.72  # cosine similarity; conservative
+DEFAULT_THRESHOLD = 0.55  # cosine similarity. Dropped from 0.72 because
+# Dylan's enrolled embedding came from a different recording session
+# (the 75-min reference clip) than his MacBook Air built-in mic captures
+# now — cross-recording-condition drift puts honest matches at ~0.55-0.65.
+# 0.55 is still tighter than the resemblyzer paper's "different speaker"
+# baseline of ~0.45 but loose enough that legitimate Dylan-speech clears.
 
 
 _encoder = None
