@@ -364,6 +364,16 @@ function handlePyEvent(evt) {
       break;
     case 'mode_changed':
       state.face?.setMode?.(evt.data.mode); break;
+    case 'assistant_emotion':
+      // Brain inferred sentiment from her response — drive smile/brow
+      // blendshapes so her face expresses the mood while she speaks.
+      // null values reset to mode default.
+      if (evt.data.smile == null && evt.data.browLift == null) {
+        state.face?.setMode?.(state.cfg?.mode || 'warm');
+      } else {
+        state.face?.setEmotion?.(evt.data);
+      }
+      break;
     case 'data_updated': refreshAll(); break;
   }
 }

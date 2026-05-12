@@ -148,6 +148,10 @@ export class PenelopeFace {
       uniforms: this.uniforms,
       transparent: true,
       blending: THREE.NormalBlending,
+      // BFM mesh is forehead-to-chin only (no back-of-head), and ±24°
+      // rotation never shows the back, so depth testing doesn't help.
+      // depthWrite off lets all 8M transparent particles blend without
+      // z-buffer artifacts from arbitrary point rendering order.
       depthWrite: false,
       vertexShader: `
         attribute vec3  aColor;
@@ -166,60 +170,57 @@ export class PenelopeFace {
         varying vec3  vColor;
         varying float vGlow;
         varying float vSeed;
+        varying float vLambert;
 
         void main() {
           vec3 pos = position;
           float seed = aSeed;
           float region = aRegion;   // 0=skin 1=eye 2=brow 3=lip 4=nose 6=jaw
 
-          // ── HEAD ROTATION (the 3D feel) ─────────────────────────
-          // Slow continuous yaw (left-right) and pitch (up-down) so the
-          // head is visibly a 3D object in space, not a flat decal.
-          float yaw   = sin(uTime * 0.25) * 0.18;       // ±10°
-          float pitch = sin(uTime * 0.19) * 0.06;       // ±3.5°
-          // Apply rotation around origin BEFORE breath/drift so the
-          // whole head moves as one
+          // ── HEAD ROTATION (visible 3D feel) ─────────────────────
+          // Range cranked up so the rotation is obviously a 3D head
+          // turning in space (visible volume difference between sides
+          // and front as she rotates).
+          float yaw   = sin(uTime * 0.20) * 0.42;       // ±24°
+          float pitch = sin(uTime * 0.14) * 0.14;       // ±8°
           float cy = cos(yaw),   sy = sin(yaw);
           float cp = cos(pitch), sp = sin(pitch);
-          // Pitch around X axis
           vec3 p1 = vec3(pos.x, pos.y * cp - pos.z * sp, pos.y * sp + pos.z * cp);
-          // Yaw around Y axis
           pos = vec3(p1.x * cy + p1.z * sy, p1.y, -p1.x * sy + p1.z * cy);
 
-          // ── Breath (pronounced — visible scale + tiny float) ────
-          // Whole-head breath scale (visible 2-3% wiggle) + drift up/down
-          pos *= 1.0 + 0.022 * uBreath;
-          pos.y += sin(uTime * 0.45) * 0.012;
+          // Whole-head breath (visible)
+          pos *= 1.0 + 0.028 * uBreath;
+          pos.y += sin(uTime * 0.45) * 0.014;
 
           // Sub-pixel kinetic drift — same seeded sin/cos as the rest of the UI
           pos.x += sin(uTime * 0.9 + seed * 11.0) * 0.0025;
           pos.y += cos(uTime * 0.7 + seed * 13.0) * 0.0025;
           pos.z += sin(uTime * 1.1 + seed *  7.0) * 0.0018;
 
-          // ── Blendshape morphs by region ─────────────────────────
-          // EYE region collapses on blink
+          // ── Blendshape morphs by region (amplified for visibility) ─
+          // EYE region: collapses on blink (visible lid drop)
           float isEye  = step(0.5, region) * step(region, 1.5);
-          pos.y = mix(pos.y, mix(pos.y, 0.05, 0.7), isEye * uBlink);
+          // Drop eye-region particles toward the eye centerline
+          pos.y = mix(pos.y, 0.18, isEye * uBlink * 0.85);
 
-          // BROW region lifts up on browLift / surprise
+          // BROW region: raises on browLift / surprise
           float isBrow = step(1.5, region) * step(region, 2.5);
-          pos.y += isBrow * uBrowLift * 0.06;
+          pos.y += isBrow * uBrowLift * 0.10;
 
-          // LIP region: jawOpen pulls lower lip down, smile pulls corners
+          // LIP region: jawOpen pulls lower lip DOWN, smile pulls corners up
           float isLip  = step(2.5, region) * step(region, 3.5);
-          float jawAmt = (uJaw * 0.04 + uMouthOpen * 0.06);
-          // Lower lip = lip particles with y < 0
-          float lowerLip = isLip * smoothstep(0.0, -0.1, pos.y);
+          float jawAmt = (uJaw * 0.08 + uMouthOpen * 0.13);
+          float lowerLip = isLip * smoothstep(0.0, -0.15, pos.y);
           pos.y -= jawAmt * lowerLip;
-          // Mouth wide stretches lip particles outward
-          pos.x += isLip * uMouthWide * 0.04 * sign(pos.x);
-          // Smile pulls outer lip corners up
-          float cornerMask = isLip * smoothstep(0.25, 0.45, abs(pos.x));
-          pos.y += uSmile * 0.025 * cornerMask;
+          // Mouth wide / round
+          pos.x += isLip * uMouthWide * 0.08 * sign(pos.x);
+          // Smile — outer lip corners up
+          float cornerMask = isLip * smoothstep(0.20, 0.45, abs(pos.x));
+          pos.y += uSmile * 0.05 * cornerMask;
 
-          // JAW region drops on heavy bass / open mouth
+          // JAW region: drops fully on jawOpen / mouthOpen
           float isJaw = step(5.5, region) * step(region, 6.5);
-          pos.y -= isJaw * (uJaw * 0.05 + uMouthOpen * 0.07);
+          pos.y -= isJaw * (uJaw * 0.09 + uMouthOpen * 0.14);
 
           // ── Boot scatter → converge ─────────────────────────────
           vec3 scattered = position + vec3(
@@ -232,10 +233,16 @@ export class PenelopeFace {
 
           vec4 mv = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mv;
-          // Fixed-pixel-size tiny points. With 8M particles overlapping
-          // ~30-60 per pixel, even 2px points saturate. Keep them at
-          // 1.0-1.4 px — the DENSITY does the heavy lifting, not size.
           gl_PointSize = 1.0 + 0.4 * uBootProgress;
+
+          // Approx surface normal from position (head ≈ ovoid, so
+          // direction-from-origin ≈ outward normal). Used for cinematic
+          // lighting that REVEALS form as the head rotates.
+          vec3 approx_normal = normalize(pos);
+          // Light direction: upper-left front (classic 3-pt key light).
+          vec3 light_dir = normalize(vec3(-0.3, 0.4, 1.0));
+          // Lambert with ambient floor so shadowed-side still renders
+          vLambert = max(0.25, dot(approx_normal, light_dir));
 
           vColor = aColor;
           vGlow = uIntensity * (0.55 + 0.45 * seed) * uBootProgress;
@@ -249,35 +256,23 @@ export class PenelopeFace {
         varying vec3  vColor;
         varying float vGlow;
         varying float vSeed;
+        varying float vLambert;
         void main() {
-          // Normal blending — each particle alpha-blends over the
-          // previous. With per-pixel density of ~30-100 particles and
-          // alpha ~0.1, accumulated opacity hits 0.95+ in dense areas
-          // but the per-particle COLOR variation modulates the
-          // resulting pixel — eyes/lips/brows read dark, skin reads
-          // bright cyan.
-
           float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
+          if (lum < 0.015) discard;
 
-          // Strong cyan hologram tint with bright highlight pop on
-          // the brightest pixels (forehead, cheekbones, teeth).
-          // Dark photo regions stay almost-black so eyes/lips/hair
-          // read as features and don't melt into the wash.
-          vec3 c = uAccent * (0.03 + 1.8 * lum);
-          // Highlight pop — pushes brightest photo pixels toward white
-          c += vec3(0.7, 1.0, 1.0) * pow(lum, 4.0) * 1.4;
-          // Clamp to avoid pure white blowout but keep highlights pop
+          // Cyan hologram tint MODULATED BY 3D LIGHTING. The lambert
+          // factor brightens lit-side particles and darkens shadow
+          // side, so when the head rotates the volume reads as 3D
+          // (cheekbone catches highlight, neck/jaw underside dark, etc).
+          vec3 c = uAccent * (0.03 + 1.8 * lum) * vLambert;
+          // Highlight pop on bright skin pixels — also lambert-scaled
+          c += vec3(0.7, 1.0, 1.0) * pow(lum, 4.0) * 1.4 * vLambert;
           c = min(c, vec3(2.0));
 
-          // Per-particle twinkle
           float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + vSeed * 19.0);
 
-          // Per-particle alpha. With 30-50 particles per pixel and 0.10
-          // alpha, accumulated opacity ~0.97 — face fully opaque on the
-          // densest pixels, photo gradient comes through via per-pixel
-          // color variation rather than transparency variation.
-          float alpha = 0.10 * twinkle;
-          alpha *= (0.6 + 0.4 * vGlow);
+          float alpha = 0.10 * twinkle * (0.6 + 0.4 * vGlow);
 
           gl_FragColor = vec4(c, alpha);
         }

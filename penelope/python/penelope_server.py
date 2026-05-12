@@ -468,9 +468,37 @@ HANDLERS = {
 
 # ----- Conversation loop ---------------------------------------------------
 
+def _sentiment_to_emotion(text: str) -> dict:
+    """Cheap sentiment → emotion mapping. Word-level, fast, no ML.
+    Returns {smile: 0..1, browLift: -0.5..0.5}.
+    """
+    t = text.lower()
+    happy = sum(1 for w in (
+        "haha", "love", "great", "amazing", "perfect", "yes", "beautiful",
+        "papi", "good", "nice", "wonderful", "cariño", "querido", "mi amor",
+        "winning", "money", "growth", "amor", "awesome", "stoked",
+    ) if w in t)
+    surprised = sum(1 for w in (
+        "wow", "oh", "really", "wait", "!", "huh", "interesting",
+        "actually", "no way",
+    ) if w in t)
+    sad = sum(1 for w in (
+        "sorry", "sad", "miss", "down", "low", "tired", "exhausted",
+        "dropped", "lost",
+    ) if w in t)
+    angry = sum(1 for w in (
+        "fuck", "shit", "damn", "broken", "wrong", "stop", "fail",
+    ) if w in t)
+    # Compose
+    smile = max(0.0, min(1.0, 0.15 + happy * 0.18 - sad * 0.25 - angry * 0.10))
+    brow = max(-0.4, min(0.6, surprised * 0.25 - sad * 0.20 - angry * 0.15))
+    return {"smile": float(smile), "browLift": float(brow)}
+
+
 async def speak(text: str):
-    """Synthesize + push audio + visemes to renderer."""
+    """Synthesize + push audio + visemes + emotion to renderer."""
     emit("assistant_text", {"text": text})
+    emit("assistant_emotion", _sentiment_to_emotion(text))
     STATE["speaking"] = True
     try:
         audio_url, visemes = await tts.synthesize(text, STATE["config"])
@@ -481,6 +509,8 @@ async def speak(text: str):
     finally:
         STATE["speaking"] = False
         emit("assistant_idle", {})
+        # Reset emotion back to mode default when she stops speaking
+        emit("assistant_emotion", {"smile": None, "browLift": None})
         transcripts.append("penelope", text)
 
 

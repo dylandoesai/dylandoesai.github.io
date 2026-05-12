@@ -28,3 +28,19 @@ renderer/vendor/
 # dylandoesai.github.io remote.
 config/config.json
 config/revenue.json
+
+# OpenWakeWord training mp3s, regenerable via scripts/train_wake_words.py
+build/wake_train/
+
+# Voice audition mp3s
+assets/_voice_audition/
+
+# 213 MB face-cloud binary, regenerable via scripts/build_face_cloud.py
+assets/face-cloud.bin
+
+# Per-photo 3DDFA params (regenerable via scripts/run_3ddfa.py)
+assets/penelope_3d_per_photo/
+
+# Voice ID embeddings (personal)
+.penelope_owner_embeddings.npy
+assets/owner_voice.npy
