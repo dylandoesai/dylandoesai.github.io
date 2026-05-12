@@ -72,7 +72,6 @@ from integrations import (
     apple_cal,
     apple_mail,
     apple_reminders,
-    apple_weather,
     elevenlabs_src,
     gumroad_src,
     home_assistant,
@@ -115,11 +114,12 @@ def current_shift_state() -> dict:
 
 @mcp.tool()
 async def current_weather() -> dict:
-    """Current conditions. Prefers Apple Weather widget data; falls back
-    to Open-Meteo at Dylan's location."""
-    aw = apple_weather.current()
-    if aw and aw.get("temperature_f") is not None:
-        return {"source": "Apple Weather", **aw}
+    """Current conditions via Open-Meteo at Dylan's configured location.
+
+    Note: there used to be an Apple Weather scrape first here, but it
+    activated the Weather app every read, which surfaced as Penelope
+    randomly opening Weather. Removed 2026-05-11.
+    """
     cfg = config_loader.load()
     om = await weather.current(cfg.get("weather_location"))
     return {"source": "Open-Meteo", **(om or {})}
