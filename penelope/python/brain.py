@@ -36,6 +36,7 @@ from integrations import elevenlabs_src
 
 CLAUDE_BIN = shutil.which("claude") or "claude"
 CLAUDE_MODEL = "claude-opus-4-7"
+MCP_CONFIG = str(Path(__file__).resolve().parent.parent / "config" / "mcp.json")
 
 
 async def chat(user_text: str, state: dict) -> str:
@@ -152,10 +153,12 @@ async def _call_claude(prompt: str, sys_prompt: str) -> str:
     args = [
         CLAUDE_BIN, "--print", "--model", CLAUDE_MODEL,
         "--append-system-prompt", sys_prompt,
-        # Restrict tool use to safe defaults for the voice-conversation
-        # path. For full agent mode (when you say "Penelope, edit my X"),
-        # we'll re-spawn with broader permissions.
-        "--allowedTools", "Read,Write,Edit,Bash,WebFetch",
+        # Tool surface: standard agent tools + every Penelope MCP tool
+        # (reminders/calendar/mail/imessage/phone/spotify/stremio/homekit/
+        # weather/revenue/analytics — see python/penelope_mcp_server.py).
+        "--allowedTools",
+        "Read,Write,Edit,Bash,WebFetch,WebSearch,Task,TodoWrite,mcp__penelope__*",
+        "--mcp-config", MCP_CONFIG,
     ]
     if os.path.isdir(dev_memory):
         args.extend(["--add-dir", dev_memory])

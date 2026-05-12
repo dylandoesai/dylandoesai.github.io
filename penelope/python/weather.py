@@ -1,8 +1,11 @@
-"""Weather via Open-Meteo (no API key).
+"""Weather: Apple Weather widget first, Open-Meteo as fallback.
 
-Per spec: Open-Meteo + auto-geolocate. We do auto-geolocate by querying
-ip-api.com (free, IP-based; good enough for "current city" weather).
-If config.json -> weather_location is set explicitly, we use that.
+Per Dylan's preference (2026-05-11): try the Apple Weather widget data
+first (matches what he sees on his Mac). If unavailable or returns nothing,
+fall back to Open-Meteo + auto-geolocate via ip-api.com.
+
+If config.json -> weather_location is set explicitly, we use it for the
+Open-Meteo fallback.
 """
 
 from __future__ import annotations
@@ -11,6 +14,8 @@ import asyncio
 import json
 
 import requests
+
+from integrations import apple_weather
 
 WMO = {
     0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast",
@@ -29,6 +34,20 @@ async def current(location=None) -> dict:
 
 
 def _fetch(location):
+    # 1. Apple Weather first — matches what Dylan sees on his Mac.
+    try:
+        aw = apple_weather.current()
+        if aw and aw.get("temperature_f") is not None:
+            return {
+                "source": "Apple Weather",
+                "city": "",
+                "temp_f": int(aw["temperature_f"]),
+                "condition": aw.get("condition") or "",
+            }
+    except Exception:
+        pass
+
+    # 2. Open-Meteo fallback.
     try:
         if location and "lat" in location:
             lat, lon, city = location["lat"], location["lon"], location.get("city", "")

@@ -66,6 +66,24 @@ function hideWindow() {
 ipcMain.handle('penelope:showWindow', () => { showWindow(); });
 ipcMain.handle('penelope:hideWindow', () => { hideWindow(); });
 
+function loadConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(
+      path.join(__dirname, '..', 'config', 'config.json'), 'utf8'));
+  } catch { return {}; }
+}
+
+function maybeWakeClaudeApp(phrase) {
+  // Penelope IS Claude Code under the hood — same brain, no shared
+  // session with Claude.app. But Dylan asked for the desktop chat to
+  // come alongside on full wake. Opt-in via wake_companion.open_claude_app.
+  const cfg = loadConfig();
+  const companion = (cfg.wake_companion || {});
+  if (phrase === 'papis_home' && companion.open_claude_app) {
+    try { execSync('open -a "Claude"'); } catch {}
+  }
+}
+
 function startPython() {
   py = new PythonBridge({
     cwd: path.join(__dirname, '..'),
@@ -73,6 +91,7 @@ function startPython() {
       // Wake events show the window before the renderer hears them
       if (evt && evt.event === 'hotword') {
         showWindow();
+        maybeWakeClaudeApp(evt.phrase);
       } else if (evt && evt.event === 'go_sleep') {
         hideWindow();
       }

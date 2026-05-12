@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "MCP servers Penelope's brain can reach.",
+    "",
+    "`penelope` (local stdio): exposes every Apple/Spotify/Stremio/iMessage/",
+    "HomeKit/revenue/analytics integration as a first-class tool so the",
+    "claude --print subprocess can call them directly. Implemented in",
+    "python/penelope_mcp_server.py.",
+    "",
+    "Inherit any other MCP servers Dylan has configured globally at",
+    "~/.claude/settings.json — those just work alongside this one."
+  ],
+  "mcpServers": {
+    "penelope": {
+      "command": "/Users/dylanireland/dylandoesai.github.io/penelope/.venv/bin/python",
+      "args": [
+        "/Users/dylanireland/dylandoesai.github.io/penelope/python/penelope_mcp_server.py"
+      ]
+    }
+  }
+}
