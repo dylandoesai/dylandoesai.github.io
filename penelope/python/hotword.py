@@ -80,11 +80,15 @@ def _run_porcupine(access_key: str, ppn_paths, labels, on_detect):
 
 def _run_whisper_fallback(on_detect):
     from faster_whisper import WhisperModel
+    import voice_id
     model = WhisperModel("tiny.en", compute_type="int8")
     sr = 16000
     window = 2.0  # seconds
     step = 0.6    # seconds between checks
     buf = np.zeros(int(sr * window), dtype=np.float32)
+    # Voice-ID gating: if Dylan has enrolled, only fire on his voice.
+    # If no profile exists, fail-open (Penelope still usable pre-enrollment).
+    require_owner = voice_id.owner_enrolled()
 
     def cb(indata, *_):
         nonlocal buf
@@ -115,6 +119,12 @@ def _run_whisper_fallback(on_detect):
                 continue
             which = _match_wake(text)
             if which:
+                if require_owner:
+                    is_owner, sim = voice_id.is_owner(buf.copy())
+                    if not is_owner:
+                        print(f"[hotword] ignored '{which}' — speaker sim={sim:.2f}",
+                              file=sys.stderr)
+                        continue
                 on_detect(which)
                 # cool-down so we don't re-fire on echo of the song
                 time.sleep(15)

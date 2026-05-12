@@ -226,6 +226,95 @@ def _purge_calendar(calendar_name: str, days_window: int = 60) -> int:
     return 0
 
 
+def _date_already_has_shift(d: dt.date) -> bool:
+    """Check if a shift event for this date is already on the Penelope · Work
+    calendar (idempotent push). EventKit read is fast even without write
+    permission, so we use that."""
+    s = _get_event_store()
+    if s is None:
+        return False
+    target = None
+    for c in (s.calendarsForEntityType_(0) or []):
+        if c.title() == WORK_CAL:
+            target = c
+            break
+    if target is None:
+        return False
+    import Foundation
+    start = dt.datetime.combine(d, dt.time.min)
+    end = start + dt.timedelta(days=1)
+    pred = s.predicateForEventsWithStartDate_endDate_calendars_(
+        Foundation.NSDate.dateWithTimeIntervalSince1970_(start.timestamp()),
+        Foundation.NSDate.dateWithTimeIntervalSince1970_(end.timestamp()),
+        [target])
+    evs = s.eventsMatchingPredicate_(pred) or []
+    return len(evs) > 0
+
+
+def push_shift_schedule_chunk(cfg: dict, start_offset: int, days: int) -> dict:
+    """Push `days` work-day events starting `start_offset` days from today.
+    Idempotent — skips dates that already have events."""
+    import shift_state
+    ws = cfg.get("work_schedule") or {}
+    times = ws.get("shift_times") or {
+        "day":   {"start": "06:45", "end": "18:45"},
+        "night": {"start": "18:45", "end": "06:45"},
+    }
+    routine = ws.get("routine") or {
+        "wake_for_day": "05:00", "leave_for_day": "05:25",
+        "wake_for_night": "17:00", "leave_for_night": "17:25",
+    }
+
+    def hhmm(s):
+        h, m = s.split(":")
+        return dt.time(int(h), int(m))
+
+    today = dt.date.today()
+    added = skipped = failed = 0
+    for n in range(start_offset, start_offset + days):
+        d = today + dt.timedelta(days=n)
+        letter = shift_state.letter_for_date({"work_schedule": ws}, d)
+        if letter not in ("D", "N"):
+            continue
+        if _date_already_has_shift(d):
+            skipped += 1
+            continue
+        kind = "day" if letter == "D" else "night"
+        title = f"O-I Kalama — {'Day' if kind == 'day' else 'Night'} shift"
+        start_t = hhmm(times[kind]["start"])
+        end_t = hhmm(times[kind]["end"])
+        start_dt = dt.datetime.combine(d, start_t)
+        end_dt = dt.datetime.combine(
+            d + (dt.timedelta(days=1) if kind == "night" else dt.timedelta()),
+            end_t)
+        if create_event(title, start_dt, end_dt, calendar=WORK_CAL,
+                        location="O-I Kalama Glass Plant",
+                        notes="Auto-created by Penelope"):
+            added += 1
+        else:
+            failed += 1
+        wake_t = hhmm(routine[f"wake_for_{kind}"])
+        wake_dt = dt.datetime.combine(d, wake_t)
+        if create_event(f"Wake up for {kind} shift", wake_dt,
+                        wake_dt + dt.timedelta(minutes=15),
+                        calendar=WORK_CAL,
+                        notes="Penelope will start gently waking you up around now."):
+            added += 1
+        else:
+            failed += 1
+        leave_t = hhmm(routine[f"leave_for_{kind}"])
+        leave_dt = dt.datetime.combine(d, leave_t)
+        if create_event(f"Leave for {kind} shift", leave_dt,
+                        leave_dt + dt.timedelta(minutes=10),
+                        calendar=WORK_CAL,
+                        notes="Penelope will nudge you out the door."):
+            added += 1
+        else:
+            failed += 1
+    return {"added": added, "skipped": skipped, "failed": failed,
+            "range": [start_offset, start_offset + days]}
+
+
 def push_shift_schedule(cfg: dict, days_ahead: int = 30,
                         wipe_existing: bool = True) -> dict:
     """Push the next `days_ahead` work days from work_schedule.json into the

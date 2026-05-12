@@ -36,6 +36,38 @@ import time
 
 # --- discovery --------------------------------------------------------------
 
+def list_fire_tv_devices(timeout: float = 3.0) -> list[str]:
+    """Discover Amazon Fire TV / Firestick devices on the LAN via
+    _amzn-wplay._tcp (Whisperplay). They won't accept native AirPlay
+    unless they have AirReceiver app installed and running — the
+    standalone Whisperplay record means the device is reachable but
+    needs AirReceiver to be a mirror target."""
+    try:
+        proc = subprocess.Popen(
+            ["dns-sd", "-B", "_amzn-wplay._tcp", "local."],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    except FileNotFoundError:
+        return []
+    time.sleep(timeout)
+    try: proc.terminate()
+    except Exception: pass
+    try:
+        out, _ = proc.communicate(timeout=2)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try: out, _ = proc.communicate(timeout=1)
+        except Exception: out = ""
+    seen = set()
+    for line in (out or "").splitlines():
+        if " Add " in line and "_amzn-wplay._tcp" in line:
+            parts = line.rstrip("\n").split("_amzn-wplay._tcp.", 1)
+            if len(parts) == 2:
+                name = parts[1].strip()
+                if name:
+                    seen.add(name)
+    return sorted(seen)
+
+
 def list_receivers(timeout: float = 3.0) -> list[str]:
     """Discover _airplay._tcp services on the LAN via dns-sd.
 

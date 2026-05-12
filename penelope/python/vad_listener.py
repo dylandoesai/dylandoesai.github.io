@@ -78,4 +78,17 @@ async def next_utterance(state):
     if not buffer:
         return None
     pcm = np.frombuffer(buffer, dtype=np.int16).astype(np.float32) / 32768.0
+
+    # Speaker-ID gate: if Dylan has enrolled, drop utterances that don't
+    # match his voice. Fail-open if not enrolled.
+    try:
+        import voice_id
+        if voice_id.owner_enrolled():
+            is_owner, sim = voice_id.is_owner(pcm)
+            if not is_owner:
+                # Not Dylan — silently ignore the utterance.
+                return None
+    except Exception:
+        pass
+
     return pcm
