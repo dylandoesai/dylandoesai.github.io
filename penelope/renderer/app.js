@@ -104,6 +104,11 @@ function handlePyEvent(evt) {
     case 'face_seen':
       // Webcam saw owner — no automatic wake (user requested wake-words only).
       break;
+    case 'mode_changed':
+      if (state.face && typeof state.face.setMode === 'function') {
+        state.face.setMode(evt.data.mode);
+      }
+      break;
     case 'proactive_alert':
       handleAlert(evt.data);
       break;

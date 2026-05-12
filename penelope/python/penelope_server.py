@@ -169,6 +169,7 @@ async def handle_set_mode(params):
     mode = params.get("mode", "warm")
     if mode in ("warm", "flirty", "professional"):
         STATE["mode"] = mode
+        emit("mode_changed", {"mode": mode})
     return {"mode": STATE["mode"]}
 
 

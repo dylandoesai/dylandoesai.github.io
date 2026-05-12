@@ -153,11 +153,13 @@ async def _call_claude(prompt: str, sys_prompt: str) -> str:
     args = [
         CLAUDE_BIN, "--print", "--model", CLAUDE_MODEL,
         "--append-system-prompt", sys_prompt,
-        # Tool surface: standard agent tools + every Penelope MCP tool
-        # (reminders/calendar/mail/imessage/phone/spotify/stremio/homekit/
-        # weather/revenue/analytics — see python/penelope_mcp_server.py).
+        # Tool surface: every standard Claude Code agent tool + Penelope's
+        # own MCP server (reminders/calendar/mail/imessage/phone/spotify/
+        # stremio/homekit/weather/revenue/analytics) + EVERY OTHER MCP
+        # server Dylan has globally (Slack, Gmail, Calendar, etc.). She
+        # IS Claude Code — same tool surface I have.
         "--allowedTools",
-        "Read,Write,Edit,Bash,WebFetch,WebSearch,Task,TodoWrite,mcp__penelope__*",
+        "Read,Write,Edit,Bash,WebFetch,WebSearch,Task,TodoWrite,Glob,Grep,mcp__*",
         "--mcp-config", MCP_CONFIG,
     ]
     if os.path.isdir(dev_memory):

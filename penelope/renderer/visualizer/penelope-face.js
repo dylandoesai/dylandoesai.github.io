@@ -248,6 +248,26 @@ export class PenelopeFace {
     this.renderer.setPixelRatio(on ? 1 : Math.min(window.devicePixelRatio || 1, 2));
   }
 
+  // Subtle visual differentiation per personality mode. Keep cyan #00E5FF
+  // as the canonical accent (locked in spec), but shift baseline intensity
+  // + breath cadence + ambient drift so the face FEELS different in each.
+  setMode(mode) {
+    this._mode = mode || 'warm';
+    if (mode === 'flirty') {
+      this._idleIntensity = 0.72;
+      this._breathRate = 0.32;     // slower, deeper
+      this._ambientDrift = 1.4;
+    } else if (mode === 'professional') {
+      this._idleIntensity = 0.48;
+      this._breathRate = 0.55;     // steadier
+      this._ambientDrift = 0.7;    // less drift, crisper
+    } else { // warm (default)
+      this._idleIntensity = 0.6;
+      this._breathRate = 0.45;
+      this._ambientDrift = 1.0;
+    }
+  }
+
   // Begin the 12-second cinematic assembly.
   // Returns a Promise that resolves when done.
   bootAssemble(durationMs = 12000) {
@@ -277,7 +297,7 @@ export class PenelopeFace {
   setIdle() {
     this._vJaw = 0; this._vCheek = 0; this._vEye = 0;
     this._vMouthOpen = 0; this._vMouthWide = 0;
-    this._vIntensity = 0.55;
+    this._vIntensity = this._idleIntensity != null ? this._idleIntensity : 0.55;
   }
 
   start() {
@@ -287,8 +307,9 @@ export class PenelopeFace {
       const u = this.uniforms;
       u.uTime.value = t;
 
-      // breath: slow sinusoid
-      u.uBreath.value = Math.sin(t * 0.45) * 0.5 + 0.5;
+      // breath: slow sinusoid, rate per mode (flirty slow/deep, pro steady)
+      const breathRate = this._breathRate != null ? this._breathRate : 0.45;
+      u.uBreath.value = Math.sin(t * breathRate) * 0.5 + 0.5;
 
       // blink: short triangle pulse over ~150ms
       if (this._blinking) {
