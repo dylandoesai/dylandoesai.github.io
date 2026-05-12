@@ -225,6 +225,48 @@ async def handle_shutdown(_params):
     sys.exit(0)
 
 
+async def handle_get_panel_data(_params):
+    """Return fresh data for the renderer's three side panels in one call.
+
+    Revenue is the aggregate from brain.gather_revenue (Stripe + Gumroad
+    + AdSense + ElevenLabs). Analytics is the per-platform upload-post
+    summary. Schedule is today's Apple Calendar + Reminders, formatted
+    for the schedule-panel renderer.
+
+    Everything runs in parallel — total time = max of the slowest source."""
+    loop = asyncio.get_running_loop()
+    rev_task = asyncio.create_task(brain.gather_revenue())
+    an_task = asyncio.create_task(brain.gather_analytics())
+    cal_task = loop.run_in_executor(None, apple_cal.today_events)
+    rem_task = loop.run_in_executor(None, apple_reminders.scheduled_today)
+    rev = await rev_task
+    analytics = await an_task
+    try:
+        cal_events = await cal_task
+    except Exception:
+        cal_events = []
+    try:
+        reminders = await rem_task
+    except Exception:
+        reminders = []
+    schedule = {"events": [
+        {"time": e.get("time", ""),
+         "title": e.get("title", ""),
+         "where": e.get("where", "")}
+        for e in cal_events
+    ]}
+    todos = {"items": [
+        {"text": r.get("title", ""), "done": False, "priority": "med"}
+        for r in reminders
+    ]}
+    return {
+        "revenue": rev,
+        "analytics": analytics,
+        "schedule": schedule,
+        "todos": todos,
+    }
+
+
 HANDLERS = {
     "start": handle_start,
     "daily_brief": handle_daily_brief,
@@ -236,6 +278,7 @@ HANDLERS = {
     "reload_config": handle_reload_config,
     "sleep": handle_sleep,
     "shutdown": handle_shutdown,
+    "get_panel_data": handle_get_panel_data,
 }
 
 

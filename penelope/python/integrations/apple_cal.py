@@ -62,36 +62,75 @@ return output
 """
 
 
-def today_events():
-    try:
-        r = subprocess.run(["osascript", "-e", _SCRIPT_TODAY],
-                           capture_output=True, text=True, timeout=60)
-        if r.returncode != 0:
-            return []
-    except Exception:
-        return []
-    out = []
-    for line in r.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) < 2:
-            continue
-        sort_key = parts[0]
-        title = parts[1]
-        where = parts[2] if len(parts) > 2 else ""
-        cal = parts[3] if len(parts) > 3 else ""
+# EventKit-backed read — AppleScript hit 60s timeout across 12 calendars
+# on Dylan's machine. EventKit returns the same data in <100ms.
+_event_store = None
+_event_store_lock = None
+
+
+def _get_event_store():
+    global _event_store, _event_store_lock
+    if _event_store_lock is None:
+        import threading
+        _event_store_lock = threading.Lock()
+    with _event_store_lock:
+        if _event_store is not None:
+            return _event_store
         try:
-            t = time.strptime(sort_key[:12], "%Y%m%d%H%M")
-            ts = int(time.mktime(t))
-            tstr = time.strftime("%I:%M %p", t).lstrip("0")
-        except ValueError:
-            ts = None
-            tstr = ""
+            import EventKit
+            import Foundation
+        except ImportError:
+            return None
+        s = EventKit.EKEventStore.alloc().init()
+        done = [False]; ok = [False]
+
+        def cb(granted, err):
+            ok[0] = bool(granted); done[0] = True
+
+        if hasattr(s, "requestFullAccessToEventsWithCompletion_"):
+            s.requestFullAccessToEventsWithCompletion_(cb)
+        else:
+            # 0 = EKEntityTypeEvent
+            s.requestAccessToEntityType_completion_(0, cb)
+        loop = Foundation.NSRunLoop.currentRunLoop()
+        deadline = time.time() + 10
+        while not done[0] and time.time() < deadline:
+            loop.runUntilDate_(
+                Foundation.NSDate.dateWithTimeIntervalSinceNow_(0.05))
+        if not ok[0]:
+            return None
+        _event_store = s
+        return _event_store
+
+
+def today_events():
+    s = _get_event_store()
+    if s is None:
+        return []
+    import Foundation
+    today = dt.date.today()
+    start = dt.datetime.combine(today, dt.time.min).astimezone()
+    end = start + dt.timedelta(days=1)
+    ns_start = Foundation.NSDate.dateWithTimeIntervalSince1970_(start.timestamp())
+    ns_end = Foundation.NSDate.dateWithTimeIntervalSince1970_(end.timestamp())
+    pred = s.predicateForEventsWithStartDate_endDate_calendars_(
+        ns_start, ns_end, None)
+    events = s.eventsMatchingPredicate_(pred) or []
+    out = []
+    for e in events:
+        cal_name = e.calendar().title() if e.calendar() else ""
+        if cal_name in _SKIP_CALENDARS:
+            continue
+        sd = e.startDate()
+        ts = int(sd.timeIntervalSince1970()) if sd else None
+        tstr = time.strftime("%I:%M %p",
+                             time.localtime(ts)).lstrip("0") if ts else ""
         out.append({
             "start_ts": ts,
             "time": tstr,
-            "title": title,
-            "where": where,
-            "calendar": cal,
+            "title": str(e.title() or ""),
+            "where": str(e.location() or ""),
+            "calendar": cal_name,
         })
     out.sort(key=lambda e: e.get("start_ts") or 0)
     return out

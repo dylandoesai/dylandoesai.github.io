@@ -137,6 +137,10 @@ async function handleWake(data) {
     }
   }
 
+  // Kick off fresh panel data fetch in parallel with the boot animation
+  // so panels show LIVE numbers the moment they slide in (not stale JSON).
+  refreshPanels().catch(e => console.warn('panel refresh failed', e));
+
   const panels = [$('left-panel'), $('right-panel'), $('bottom-panel')];
   await runBootSequence({
     face: state.face,
@@ -205,10 +209,27 @@ function scheduleVisemes(visemes, audioEl) {
 }
 
 async function refreshPanels() {
-  const revenue = await window.penelope.readConfig('revenue.json');
-  const analytics = await window.penelope.readConfig('analytics.json');
-  const schedule = await window.penelope.readConfig('schedule.json');
-  const todos = await window.penelope.readConfig('todos.json');
+  // Prefer LIVE data from the Python sidecar (brain.gather_revenue +
+  // gather_analytics + apple_cal.today_events + apple_reminders.scheduled_today).
+  // Fall back to the static JSON files if the bridge isn't ready (boot,
+  // first render before start() returns).
+  let revenue, analytics, schedule, todos;
+  try {
+    const live = await window.penelope.call('get_panel_data', {});
+    if (live) {
+      revenue = live.revenue;
+      analytics = live.analytics;
+      schedule = live.schedule;
+      todos = live.todos;
+    }
+  } catch (e) {
+    console.warn('panel live-data failed, falling back to JSON', e);
+  }
+  if (!revenue)   revenue   = await window.penelope.readConfig('revenue.json');
+  if (!analytics) analytics = await window.penelope.readConfig('analytics.json');
+  if (!schedule)  schedule  = await window.penelope.readConfig('schedule.json');
+  if (!todos)     todos     = await window.penelope.readConfig('todos.json');
+
   if (revenue) renderRevenue(revenue);
   if (analytics) renderAnalytics(analytics);
   if (schedule || todos) renderSchedule(schedule || { events: [] }, todos || { items: [] });
