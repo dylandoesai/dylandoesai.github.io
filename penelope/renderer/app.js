@@ -32,9 +32,13 @@ async function boot() {
   state.cfg = (await window.penelope.readConfig('config.json')) || {};
 
   // 3D face — texture-driven particle stippling from her actual photo.
+  // Start SCATTERED (uBootProgress=0). On wake, runBootSequence drives
+  // the cinematic assembly. Modules also start hidden until the wake
+  // animation slides them in.
   state.face = new PenelopeFace($('face-canvas'));
   state.face.start();
-  state.face.uniforms.uBootProgress.value = 1;
+  state.face.uniforms.uBootProgress.value = 0;
+  document.body.classList.add('pre-wake');
 
   state.audio = new AudioAnalyzer($('tts-audio'));
   (function tick() {
@@ -367,8 +371,16 @@ function handlePyEvent(evt) {
 async function handleWake(data) {
   const phrase = data?.phrase || 'papis_home';
   const isFull = phrase === 'papis_home';
-  if (data?.already_active) { state.face?.bootAssemble?.(1500); return; }
+  if (data?.already_active) {
+    // Already awake — small flourish, don't re-run the whole brief
+    state.face?.pulse?.(0.6, 800);
+    return;
+  }
   state.active = true;
+  // Drop the pre-wake mask so modules become visible (boot sequence
+  // will then slide them in from the edges).
+  document.body.classList.remove('pre-wake');
+  // Face starts scattered — explicit reset so we always re-play assembly
   state.face.uniforms.uBootProgress.value = 0;
   if (isFull) {
     try { await window.penelope.call('play_wake_song', {}); } catch {}
@@ -393,8 +405,11 @@ async function handleWake(data) {
 function handleSleep() {
   state.active = false;
   $('status-text').textContent = 'standby';
+  // Scatter the face back out + hide modules so the next wake plays
+  // the full assembly animation again.
   state.face.uniforms.uBootProgress.value = 0;
   state.face?.setIdle();
+  document.body.classList.add('pre-wake');
 }
 
 // ── Compose ─────────────────────────────────────────────────────────────

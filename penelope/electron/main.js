@@ -56,14 +56,21 @@ function createWindow() {
 function showWindow() {
   if (!mainWindow) return;
   if (app.dock) app.dock.show();
-  mainWindow.setFullScreen(true);
+  // Order matters on macOS: show first so the window has an animation
+  // surface, then simpleFullScreen (no Space-switch flicker), then
+  // promote to actual fullscreen if the user prefers it later. Using
+  // simpleFullScreen keeps us on the current Space so the wake feels
+  // immediate instead of swiping to a separate desktop.
   mainWindow.show();
+  mainWindow.setSimpleFullScreen(true);
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.focus();
 }
 
 function hideWindow() {
   if (!mainWindow) return;
-  mainWindow.setFullScreen(false);
+  mainWindow.setSimpleFullScreen(false);
+  mainWindow.setAlwaysOnTop(false);
   mainWindow.hide();
   if (app.dock) app.dock.hide();
 }

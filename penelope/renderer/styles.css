@@ -409,15 +409,55 @@ body.show-cursor { cursor: default; }
 #boot-overlay {
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.92) 75%
+  );
   pointer-events: none;
   transition: opacity 600ms ease;
 }
 #boot-overlay.hidden { opacity: 0; }
 .boot-text {
-  font-family: var(--mono); font-size: 14px;
-  color: var(--accent); letter-spacing: 0.4em; text-transform: uppercase;
-  text-shadow: 0 0 12px var(--accent-glow);
+  font-family: var(--mono); font-size: 28px; font-weight: 300;
+  color: var(--accent); letter-spacing: 0.45em; text-transform: uppercase;
+  text-shadow:
+    0 0 14px var(--accent-glow),
+    0 0 36px rgba(0, 229, 255, 0.55),
+    0 0 72px rgba(0, 229, 255, 0.25);
+  animation: bootGlow 1.6s ease-in-out infinite alternate;
+}
+@keyframes bootGlow {
+  0%   { opacity: 0.7; letter-spacing: 0.45em; }
+  100% { opacity: 1;   letter-spacing: 0.55em; }
+}
+
+/* Pre-wake: everything but the face is invisible, plus a horizontal
+   sweep line scanning down the screen so it FEELS like she's booting.
+   Released when wake fires (body.pre-wake is removed in handleWake). */
+body.pre-wake .module,
+body.pre-wake .channel-mod,
+body.pre-wake #compose-dock,
+body.pre-wake #topbar,
+body.pre-wake #grid-overlay { opacity: 0; }
+body.pre-wake::after {
+  content: "";
+  position: fixed; left: 0; right: 0; top: 0;
+  height: 2px; pointer-events: none; z-index: 60;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--accent-glow) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 0 24px var(--accent-glow);
+  animation: scanLine 3.6s linear infinite;
+}
+@keyframes scanLine {
+  0%   { transform: translateY(0); opacity: 0.0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.9; }
+  100% { transform: translateY(100vh); opacity: 0.0; }
 }
 
 /* Scrollbar */
