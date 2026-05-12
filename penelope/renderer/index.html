@@ -24,26 +24,26 @@
 
     <aside id="left-panel" class="panel">
       <section class="card" id="revenue-card">
-        <h2>Revenue</h2>
+        <h2>Revenue <button class="detach" data-panel="revenue" title="Pop out to new window">⤢</button></h2>
         <div class="big" id="revenue-total">$0</div>
         <canvas id="revenue-chart" width="320" height="120"></canvas>
         <ul class="kv" id="revenue-list"></ul>
       </section>
       <section class="card" id="todo-card">
-        <h2>Today</h2>
+        <h2>Today <button class="detach" data-panel="todo" title="Pop out">⤢</button></h2>
         <ul id="todo-list"></ul>
       </section>
     </aside>
 
     <aside id="right-panel" class="panel">
       <section class="card" id="yt-card">
-        <h2>YouTube</h2>
+        <h2>YouTube <button class="detach" data-panel="yt" title="Pop out">⤢</button></h2>
         <div class="row" id="yt-stats"></div>
         <canvas id="yt-chart" width="320" height="100"></canvas>
         <ul class="kv" id="yt-top"></ul>
       </section>
       <section class="card" id="tt-card">
-        <h2>TikTok</h2>
+        <h2>TikTok <button class="detach" data-panel="tt" title="Pop out">⤢</button></h2>
         <div class="row" id="tt-stats"></div>
         <canvas id="tt-chart" width="320" height="100"></canvas>
         <ul class="kv" id="tt-top"></ul>
@@ -52,21 +52,34 @@
 
     <footer id="bottom-panel">
       <section class="card" id="schedule-card">
-        <h2>Schedule</h2>
+        <h2>Schedule <button class="detach" data-panel="schedule" title="Pop out">⤢</button></h2>
         <ul id="schedule-list"></ul>
       </section>
       <section class="card" id="weather-card">
-        <h2>Weather</h2>
+        <h2>Weather <button class="detach" data-panel="weather" title="Pop out">⤢</button></h2>
         <div id="weather-now"></div>
       </section>
       <section class="card" id="transcript-card">
-        <h2>Conversation</h2>
+        <h2>Conversation <button class="detach" data-panel="transcript" title="Pop out">⤢</button></h2>
         <div id="transcript"></div>
       </section>
     </footer>
 
     <div id="boot-overlay" class="hidden">
       <div class="boot-text" id="boot-text">INITIALIZING…</div>
+    </div>
+
+    <!-- Invisible compose surface — the text channel underneath the
+         persona. Type, paste links / screenshots / files, or drag-drop
+         them. Penelope speaks her reply; any links / code / long text
+         she returns render in #compose-thread above the input. -->
+    <div id="compose-dock" aria-label="Compose">
+      <div id="compose-thread"></div>
+      <div id="compose-row">
+        <div id="compose-input" contenteditable="plaintext-only"
+             data-placeholder="…"></div>
+        <div id="compose-attachments"></div>
+      </div>
     </div>
   </main>
 

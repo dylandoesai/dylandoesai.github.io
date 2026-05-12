@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('penelope', {
   // Used by the clickable panels (revenue / analytics / schedule / weather)
   // to deep-link into the source dashboard or native app.
   openExternal: (url) => ipcRenderer.invoke('penelope:openExternal', url),
+  detachPanel: (panelId) => ipcRenderer.invoke('penelope:detachPanel', panelId),
   on: (channel, handler) => {
     const listener = (_evt, payload) => handler(payload);
     ipcRenderer.on(channel, listener);

@@ -130,6 +130,41 @@ ipcMain.handle('penelope:readAsset', async (_evt, rel) => {
 const ALLOWED_SCHEMES = ['https:', 'http:', 'ical:', 'message:',
                          'x-apple-reminderkit:', 'weather:', 'spotify:',
                          'stremio:'];
+// Detached panel windows — each panel can pop out into its own
+// borderless window that Dylan can drag to another Space, resize,
+// fullscreen. Same dark + cyan styling, no chrome.
+const _detached = new Map();   // panelId -> BrowserWindow
+ipcMain.handle('penelope:detachPanel', async (_evt, panelId) => {
+  if (!panelId) return false;
+  if (_detached.has(panelId)) {
+    try { _detached.get(panelId).focus(); } catch {}
+    return true;
+  }
+  const win = new BrowserWindow({
+    width: 720, height: 480,
+    minWidth: 320, minHeight: 240,
+    backgroundColor: '#000000',
+    frame: false,
+    titleBarStyle: 'hiddenInset',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: false,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  // index.html reads location.hash to filter to just one panel
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'),
+               { hash: `panel=${panelId}` });
+  win.once('ready-to-show', () => win.show());
+  win.on('closed', () => _detached.delete(panelId));
+  _detached.set(panelId, win);
+  return true;
+});
+
 ipcMain.handle('penelope:openExternal', async (_evt, url) => {
   try {
     const u = new URL(url);

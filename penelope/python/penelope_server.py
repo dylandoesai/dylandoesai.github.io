@@ -226,6 +226,55 @@ async def handle_shutdown(_params):
     sys.exit(0)
 
 
+async def handle_text_message(params):
+    """Text channel — Dylan types / pastes / drag-drops into the compose
+    dock under Penelope's face. We save any attachments to a temp dir
+    accessible to the claude subprocess, inject their paths into the
+    prompt context, and route through brain.chat exactly like a voice
+    turn. The verbal reply still speaks via the normal TTS pipeline;
+    this RPC also returns {text, links} for inline rendering in the
+    compose thread."""
+    import base64
+    import re
+    import tempfile
+
+    text = (params.get("text") or "").strip()
+    attachments = params.get("attachments") or []
+
+    # Save attachments to a stable temp dir per session
+    saved_paths = []
+    if attachments:
+        tmpdir = Path(tempfile.gettempdir()) / "penelope_attachments"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        for i, att in enumerate(attachments):
+            name = (att.get("name") or f"attachment_{i}").replace("/", "_")
+            try:
+                blob = base64.b64decode(att.get("b64") or "")
+            except Exception:
+                continue
+            p = tmpdir / f"{int(time.time()*1000)}_{name}"
+            p.write_bytes(blob)
+            saved_paths.append(str(p))
+
+    composed = text or "(no text — see attachments)"
+    if saved_paths:
+        composed += "\n\nAttachments Dylan sent:\n" + "\n".join(
+            f"- {p}" for p in saved_paths)
+
+    # Run through the same brain.chat as a voice turn — speaks via TTS.
+    answer = await brain.chat(composed, STATE)
+    transcripts.append("dylan", text or "(attachments)")
+    transcripts.append("penelope", answer or "")
+    if answer:
+        await speak(answer)
+
+    # Extract any URLs in the answer for the compose-thread link rendering.
+    urls = re.findall(r"https?://[^\s<>\"']+", answer or "")
+    links = [{"url": u, "label": u} for u in urls]
+    # Keep the response text clean of any extracted urls for visual ordering.
+    return {"text": answer or "", "links": links}
+
+
 async def handle_get_panel_data(_params):
     """Return fresh data for the renderer's three side panels in one call.
 
@@ -287,6 +336,7 @@ HANDLERS = {
     "sleep": handle_sleep,
     "shutdown": handle_shutdown,
     "get_panel_data": handle_get_panel_data,
+    "text_message": handle_text_message,
 }
 
 
