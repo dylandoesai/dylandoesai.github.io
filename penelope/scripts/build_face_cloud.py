@@ -89,6 +89,85 @@ def detect_face_oval():
     return res.face_landmarks[0], img_bgr
 
 
+def build_hair_layer(N_hair: int, rng: np.random.Generator) -> np.ndarray:
+    """Sample N_hair particles from the HAIR + SHOULDERS region of the
+    source photo. Returns a (N_hair * 28) uint8 buffer in the same
+    record format as the face cloud, with region=7 (HAIR) and positioned
+    at z behind the face mesh.
+
+    Hair region detection: dilate the face oval outward + downward to
+    capture flowing hair and shoulder line, then subtract the face oval
+    and drop bright background pixels.
+    """
+    import cv2 as _cv2
+    img_bgr = _cv2.imread(str(TEX))
+    H_img, W_img = img_bgr.shape[:2]
+    img_rgb = _cv2.cvtColor(img_bgr, _cv2.COLOR_BGR2RGB)
+
+    mp_lm, _ = detect_face_oval()
+    face_mask = build_face_mask(img_bgr, mp_lm)
+
+    # Hair area: dilate face mask by ~30% of face size, then subtract
+    # face mask. Also drop pixels too far from the face (background).
+    face_area = (face_mask > 64).astype(np.uint8) * 255
+    # Dilation kernel sized by face bbox
+    ys, xs = np.where(face_area > 0)
+    if len(ys) == 0:
+        return np.zeros(N_hair * 28, dtype=np.uint8)
+    face_w = xs.max() - xs.min(); face_h = ys.max() - ys.min()
+    kernel_size = int(max(face_w, face_h) * 0.35)
+    kernel = _cv2.getStructuringElement(_cv2.MORPH_ELLIPSE,
+                                         (kernel_size, kernel_size))
+    expanded = _cv2.dilate(face_area, kernel)
+    hair_region = (expanded > 0) & ~(face_area > 64)
+    # Additionally drop super-bright pixels (white background) — hair
+    # in IMG_7419 is dark brown; background is near-white
+    img_lum = img_rgb.mean(axis=2)
+    hair_region = hair_region & (img_lum < 200)
+    hair_ys, hair_xs = np.where(hair_region)
+    print(f"  hair region: {len(hair_ys):,} pixels", file=sys.stderr)
+    if len(hair_ys) == 0:
+        return np.zeros(N_hair * 28, dtype=np.uint8)
+
+    # Sample N_hair pixels uniformly from the hair region
+    pick = rng.integers(0, len(hair_ys), N_hair)
+    py = hair_ys[pick]; px = hair_xs[pick]
+    rgb = img_rgb[py, px]    # (N_hair, 3) uint8
+
+    # Map photo pixels (px, py) to world coords. Use the same scale as
+    # the face mesh. Face occupied photo-y 0.215..0.842 → world-y -0.834..0.766
+    # → pixel_y_to_world_y(py) = -((py / H_img) - cy) * scale where:
+    #   cy = (0.215 + 0.842) / 2 = 0.5285  (face center in photo)
+    #   scale = 1.6 / (0.842 - 0.215) = 2.551 (so face fills target height 1.6)
+    cy_norm = 0.5285
+    scale = 1.6 / (0.842 - 0.215)
+    cx_norm = 0.5     # rough center; could be tightened
+    world_x = ((px / W_img) - cx_norm) * scale * 1.778   # 16:9 correction
+    world_y = -((py / H_img) - cy_norm) * scale
+    # Face z range is -0.52..0.55 (back of skull to nose tip). Place
+    # hair clearly BEHIND the back of the skull: z = -0.85..-0.55.
+    # When the head rotates, the hair plane stays behind, framing it
+    # like a 2D background billboard inside the 3D scene.
+    world_z = -0.85 + rng.random(N_hair, dtype=np.float32) * 0.30
+    pos = np.stack([world_x.astype(np.float32),
+                    world_y.astype(np.float32),
+                    world_z.astype(np.float32)], axis=1)
+
+    seed = rng.random(N_hair, dtype=np.float32)
+    # Pack same 28-byte layout as face particles. region=7=HAIR.
+    rec_size = 28
+    buf = np.zeros(N_hair * rec_size, dtype=np.uint8)
+    view32 = buf.view(np.float32).reshape(N_hair, rec_size // 4)
+    view32[:, 0:3] = pos
+    bytes_view = buf.reshape(N_hair, rec_size)
+    bytes_view[:, 12] = rgb[:, 0]
+    bytes_view[:, 13] = rgb[:, 1]
+    bytes_view[:, 14] = rgb[:, 2]
+    bytes_view[:, 15] = 7              # HAIR region
+    view32[:, 5] = seed
+    return buf
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, default=8_000_000)
@@ -248,13 +327,24 @@ def main():
     view16 = buf.view(np.uint16).reshape(N, rec_size // 2)
     view16[:, 12:14] = bary16.view(np.uint16)
 
-    OUT.write_bytes(buf.tobytes())
-    print(f"wrote {OUT.name}: {OUT.stat().st_size / 1024 / 1024:.1f} MB", file=sys.stderr)
+    # ── HAIR LAYER ──────────────────────────────────────────────
+    # BFM mesh is forehead-to-chin; no hair. Sample ~2M particles from
+    # the hair/silhouette region of IMG_7419 (above the face oval) and
+    # place them at z behind the face mesh so they frame the head.
+    print("sampling hair particles…", file=sys.stderr)
+    hair_buf = build_hair_layer(N_hair=2_000_000, rng=rng)
+    # CRITICAL: hair BEFORE face in the binary so it renders first
+    # (back-to-front) with alpha blending — face draws on top of hair.
+    OUT.write_bytes(hair_buf.tobytes() + buf.tobytes())
+    print(f"wrote {OUT.name}: {OUT.stat().st_size / 1024 / 1024:.1f} MB "
+          f"({N + 2_000_000} total = 2M hair + {N} face)", file=sys.stderr)
 
     META.write_text(json.dumps({
-        "count": int(N),
+        "count": int(N + 2_000_000),
+        "count_face": int(N),
+        "count_hair": 2_000_000,
         "record_size": rec_size,
-        "source": "3DDFA_V2 BFM, 25 photos averaged",
+        "source": "3DDFA_V2 BFM (face) + photo hair layer",
         "mesh_verts": int(len(vw)),
         "mesh_tris": int(len(tris)),
         "layout": {

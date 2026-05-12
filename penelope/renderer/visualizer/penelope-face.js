@@ -93,8 +93,11 @@ export class PenelopeFace {
       meta = await r.json();
     }
     const N = meta.count;
+    const N_face = meta.count_face || N;
+    const N_hair = meta.count_hair || 0;
     const RS = meta.record_size;
-    console.log(`[face] loading ${N.toLocaleString()} particles (${(N*RS/1024/1024)|0} MB)…`);
+    console.log(`[face] loading ${N.toLocaleString()} particles `
+              + `(${N_face.toLocaleString()} face + ${N_hair.toLocaleString()} hair)`);
 
     // Fetch binary — use Buffer transport when available (transparent
     // Uint8Array on the renderer side, no base64 doubling).
@@ -235,14 +238,14 @@ export class PenelopeFace {
           gl_Position = projectionMatrix * mv;
           gl_PointSize = 1.0 + 0.4 * uBootProgress;
 
-          // Approx surface normal from position (head ≈ ovoid, so
-          // direction-from-origin ≈ outward normal). Used for cinematic
-          // lighting that REVEALS form as the head rotates.
+          // Hair (region 7) is a 2D billboard layer behind the head —
+          // skip Lambert lighting on it (flat shading, full brightness).
+          // Face (regions 0-6) gets proper 3D lighting.
+          float isHair = step(6.5, region);
           vec3 approx_normal = normalize(pos);
-          // Light direction: upper-left front (classic 3-pt key light).
           vec3 light_dir = normalize(vec3(-0.3, 0.4, 1.0));
-          // Lambert with ambient floor so shadowed-side still renders
-          vLambert = max(0.25, dot(approx_normal, light_dir));
+          float face_lambert = max(0.25, dot(approx_normal, light_dir));
+          vLambert = mix(face_lambert, 0.85, isHair);
 
           vColor = aColor;
           vGlow = uIntensity * (0.55 + 0.45 * seed) * uBootProgress;
@@ -259,7 +262,9 @@ export class PenelopeFace {
         varying float vLambert;
         void main() {
           float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
-          if (lum < 0.015) discard;
+          // Only discard fully-zeroed background particles (RGB=0).
+          // Dim hair shadows etc. should still render.
+          if (lum < 0.004) discard;
 
           // Cyan hologram tint MODULATED BY 3D LIGHTING. The lambert
           // factor brightens lit-side particles and darkens shadow

@@ -1,7 +1,9 @@
 {
-  "count": 8000000,
+  "count": 10000000,
+  "count_face": 8000000,
+  "count_hair": 2000000,
   "record_size": 28,
-  "source": "3DDFA_V2 BFM, 25 photos averaged",
+  "source": "3DDFA_V2 BFM (face) + photo hair layer",
   "mesh_verts": 38365,
   "mesh_tris": 76073,
   "layout": {
