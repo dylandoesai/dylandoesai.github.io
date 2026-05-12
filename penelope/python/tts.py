@@ -33,9 +33,10 @@ TTS_CACHE.mkdir(exist_ok=True)
 DEFAULT_VOICE = "es-VE-PaolaNeural"  # warm Latin Spanish; Edge equivalent of "Helena"
 
 VOICE_ALIASES = {
-    "helena": "es-VE-PaolaNeural",
-    "elvira": "es-ES-ElviraNeural",
-    "jenny":  "en-US-JennyNeural",
+    "helena":   "es-VE-PaolaNeural",
+    "elvira":   "es-ES-ElviraNeural",
+    "jenny":    "en-US-JennyNeural",
+    "isabella": "it-IT-IsabellaNeural",
 }
 
 
