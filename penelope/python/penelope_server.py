@@ -209,19 +209,48 @@ async def handle_sleep(_params):
 
 
 async def handle_play_wake_song(_params):
-    """Play the wake song via Spotify desktop app (AppleScript)."""
+    """Play the wake song via Spotify — but only if Spotify isn't already
+    playing something Dylan wants to keep listening to.
+
+    Penelope used to unconditionally hijack Spotify on every wake, which
+    is wildly annoying during testing (and any wake while Dylan has music
+    on). The wake song is opt-in via wake_song.enabled in config.json;
+    even when enabled, if Spotify is currently playing something else, we
+    skip and let his music keep playing.
+    """
     cfg = STATE["config"] or {}
     ws = cfg.get("wake_song") or {}
+    if not ws.get("enabled"):
+        emit("log", {"msg": "wake_song disabled in config; skipping"})
+        return {"ok": False, "reason": "disabled"}
     uri = ws.get("spotify_uri") or ""
     if not uri:
         emit("log", {"msg": "wake_song.spotify_uri empty in config; skipping"})
         return {"ok": False, "reason": "no_uri"}
+    # Don't trample existing music
+    try:
+        np = spotify_ctl.now_playing()
+        if np and np.get("title"):
+            emit("log", {"msg": f"spotify already playing {np['title']!r}; "
+                                 "skipping wake song"})
+            return {"ok": False, "reason": "already_playing", "track": np}
+    except Exception:
+        pass
     ok = spotify_ctl.play_uri(uri)
+    STATE["_wake_song_active"] = bool(ok)
     return {"ok": bool(ok)}
 
 
 async def handle_stop_wake_song(_params):
-    """Smoothly fade Spotify down so Penelope's greeting is audible."""
+    """Fade out the wake song if (and only if) Penelope started it.
+
+    If she never started a wake song (because the feature is disabled, or
+    Spotify was already playing Dylan's music), this is a no-op. Critical
+    — fade_out would otherwise zero his existing music's volume and pause it.
+    """
+    if not STATE.get("_wake_song_active"):
+        return {"ok": False, "reason": "not_active"}
+    STATE["_wake_song_active"] = False
     spotify_ctl.fade_out(duration_s=3.0)
     return {"ok": True}
 
