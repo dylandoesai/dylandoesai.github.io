@@ -48,25 +48,19 @@ def play_uri(uri: str):
 
 
 def set_volume(level: int):
-    """Volume 0-100."""
-    level = max(0, min(100, int(level)))
-    _osa(f'tell application "Spotify" to set sound volume to {level}')
+    """Disabled — Dylan controls his own Spotify volume.
+
+    Kept as a no-op so any code path that still calls it doesn't blow up,
+    but it never touches the actual Spotify volume. If you need to bring
+    this back later, gate it on an explicit user request, not on Penelope
+    autonomously deciding to duck the music.
+    """
+    return  # intentionally no-op
 
 
 def fade_out(duration_s: float = 4.0, steps: int = 20):
-    """Smooth volume fade to 0 then pause. Used at end of wake song."""
-    import time
-    try:
-        cur = _osa('tell application "Spotify" to sound volume')
-        start = int(cur) if cur.isdigit() else 80
-    except Exception:
-        start = 80
-    for i in range(steps + 1):
-        v = int(start * (1 - i / steps))
-        set_volume(v)
-        time.sleep(duration_s / steps)
-    pause()
-    set_volume(start)  # restore for next play
+    """Disabled — see set_volume note."""
+    return  # intentionally no-op
 
 
 def now_playing():

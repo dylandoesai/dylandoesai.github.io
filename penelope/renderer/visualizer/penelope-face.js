@@ -1,27 +1,25 @@
-// Penelope face — Star Wars hologram approach.
+// Penelope face — 8M-particle photoreal hologram.
 //
-// The previous build stippled the photo into 7000 huge additively-blended
-// particles, which saturated into a glowing blob. New approach:
+// The mesh is built offline by scripts/build_face_cloud.py:
+//   1. MediaPipe FaceLandmarker extracts 478 3D landmarks from each of
+//      the 25 Penelope Cruz reference photos.
+//   2. The landmarks are averaged → a personal-identity 3D face mesh.
+//   3. MediaPipe's canonical 898-triangle tessellation connects them.
+//   4. 8M particles are sampled barycentrically on the mesh surface,
+//      weighted by triangle area × feature importance (eyes/lips/brows
+//      get extreme density, skin gets uniform coverage).
+//   5. Each particle gets its color sampled from the texture at its UV
+//      position, plus a region tag (skin/eye/brow/lip/nose/jaw) for
+//      blendshape morphing.
 //
-//   1. Render the photo on a plane with a custom shader that:
-//      - converts to luminance and tints cyan
-//      - adds moving horizontal scanlines (interference)
-//      - flickers + breathes opacity
-//      - quantizes brightness so it reads as data, not a photo
-//   2. Sprinkle a thin layer of tiny crisp particle dots ABOVE the
-//      photo plane — these drift kinetically along feature contours.
+// All of that is packed into assets/face-cloud.bin (213 MB, 8M × 28B).
 //
-// Result: Penelope's actual face is recognizable, with the kinetic
-// electric-blue "she's a hologram" feel layered on top.
+// This module just loads the binary into GPU buffers and renders it.
 
 import * as THREE from '../vendor/three.module.js';
 
-const IMG_REL = 'assets/penelope_base.webp';
-const SAMPLE_SIZE = 768;            // higher sample = sharper feature edges
-const PARTICLE_COUNT = 80000;        // dense enough that the face is built
-                                     // entirely by particle density — no
-                                     // photo plane needed. M-series Macs
-                                     // handle 100k points easily.
+const META_REL = 'assets/face-cloud-meta.json';
+const CLOUD_REL = 'assets/face-cloud.bin';
 
 
 export class PenelopeFace {
@@ -34,6 +32,7 @@ export class PenelopeFace {
     this._vJaw = 0; this._vCheek = 0; this._vEye = 0;
     this._vMouthOpen = 0; this._vMouthWide = 0;
     this._vIntensity = 0.65;
+    this._vSmile = 0; this._vBrowLift = 0;
     this._blinkT = 0; this._blinking = false;
     this._bootStart = null;
     this._bootDuration = 12000;
@@ -46,8 +45,8 @@ export class PenelopeFace {
 
   _initThree() {
     this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas, antialias: true, alpha: true,
-      preserveDrawingBuffer: false,
+      canvas: this.canvas, antialias: false, alpha: true,
+      preserveDrawingBuffer: false, powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -55,8 +54,8 @@ export class PenelopeFace {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
-      35, window.innerWidth / window.innerHeight, 0.01, 100);
-    this.camera.position.set(0, 0, 2.4);
+      28, window.innerWidth / window.innerHeight, 0.01, 100);
+    this.camera.position.set(0, 0, 3.2);
 
     this.clock = new THREE.Clock();
 
@@ -67,107 +66,83 @@ export class PenelopeFace {
       uJaw:          { value: 0 },
       uMouthOpen:    { value: 0 },
       uMouthWide:    { value: 0 },
+      uSmile:        { value: 0 },
+      uBrowLift:     { value: 0 },
       uCheek:        { value: 0 },
       uEye:          { value: 0 },
       uIntensity:    { value: 0.65 },
       uBootProgress: { value: 0 },
       uAccent:       { value: new THREE.Color(0x00E5FF) },
-      uTexture:      { value: null },
-      uPhotoOpacity: { value: 0 },     // ramps to 1 during boot
     };
 
-    this._buildFromImage().catch((e) => {
-      console.warn('[face] image load failed', e);
+    this._buildFromCloud().catch((e) => {
+      console.warn('[face] cloud load failed', e);
     });
   }
 
-  async _buildFromImage() {
-    const img = await this._loadImage(IMG_REL);
-    const tmp = document.createElement('canvas');
-    tmp.width = SAMPLE_SIZE; tmp.height = SAMPLE_SIZE;
-    const ctx = tmp.getContext('2d');
-    // Cover-fit
-    const scale = Math.max(SAMPLE_SIZE / img.width, SAMPLE_SIZE / img.height);
-    const dw = img.width * scale, dh = img.height * scale;
-    const dx = (SAMPLE_SIZE - dw) / 2, dy = (SAMPLE_SIZE - dh) / 2;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
-    ctx.drawImage(img, dx, dy, dw, dh);
-    const data = ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data;
+  async _buildFromCloud() {
+    const t0 = performance.now();
 
-    const W = SAMPLE_SIZE, H = SAMPLE_SIZE;
-    const lum = new Float32Array(W * H);
-    for (let i = 0; i < W * H; i++) {
-      const j = i * 4;
-      lum[i] = (0.299 * data[j] + 0.587 * data[j+1] + 0.114 * data[j+2]) / 255;
+    // Fetch metadata
+    let meta;
+    if (window.penelope?.readAsset) {
+      const b64 = await window.penelope.readAsset(META_REL);
+      meta = JSON.parse(atob(b64));
+    } else {
+      const r = await fetch(new URL('../' + META_REL, import.meta.url).href);
+      meta = await r.json();
     }
-    // Feature weight: bright skin areas get base density (so the face HAS
-    // surface), edges/dark features (eyes, brows, lips, hair, jaw line)
-    // get MUCH higher density. Background gets zero so she emerges from
-    // the void.
-    const weight = new Float32Array(W * H);
-    let maxW = 0;
-    for (let y = 1; y < H - 1; y++) {
-      for (let x = 1; x < W - 1; x++) {
-        const i = y * W + x;
-        // Sobel-style gradient (edges)
-        const gx = Math.abs(lum[i+1] - lum[i-1]) + 0.5 * Math.abs(lum[i+W+1] - lum[i+W-1]);
-        const gy = Math.abs(lum[i+W] - lum[i-W]) + 0.5 * Math.abs(lum[i+W+1] - lum[i-W+1]);
-        const grad = gx + gy;
-        const lumi = lum[i];
-        // Background mask: below 0.04 luminance → drop entirely
-        const onFace = lumi > 0.04 ? 1 : 0;
-        // Three contributions:
-        //   1) base density on her face (skin surface)
-        //   2) extra density on dark features (hair, eyes, lips)
-        //   3) BIG extra on edges (jaw line, brow line, lip outline)
-        const base = onFace * 0.18;
-        const dark = onFace * Math.max(0, 0.55 - lumi) * 1.4;
-        const edge = grad * 5.0;
-        const w = base + dark + edge;
-        weight[i] = w;
-        if (w > maxW) maxW = w;
-      }
-    }
+    const N = meta.count;
+    const RS = meta.record_size;
+    console.log(`[face] loading ${N.toLocaleString()} particles (${(N*RS/1024/1024)|0} MB)…`);
 
-    // Dense rejection sampling — 80k particles
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const seeds     = new Float32Array(PARTICLE_COUNT);
-    const sizes     = new Float32Array(PARTICLE_COUNT);
-    const bright    = new Float32Array(PARTICLE_COUNT);
-    let placed = 0;
-    let attempts = 0;
-    const cap = PARTICLE_COUNT * 60;
-    while (placed < PARTICLE_COUNT && attempts < cap) {
-      attempts++;
-      const x = (Math.random() * W) | 0;
-      const y = (Math.random() * H) | 0;
-      const i = y * W + x;
-      const wn = weight[i] / maxW;
-      if (Math.random() > wn) continue;
-      // Plane mapping: 1.5 wide × 1.875 tall portrait
-      const nx = (x / W - 0.5) * 1.5;
-      const ny = -(y / H - 0.5) * 1.875;
-      // Slight depth from luminance (lighter = forward → subtle 3D feel)
-      const nz = (lum[i] - 0.5) * 0.06;
-      const off = placed * 3;
-      positions[off]     = nx;
-      positions[off + 1] = ny;
-      positions[off + 2] = nz;
-      seeds[placed]      = Math.random();
-      // Tiny dots, 0.8-1.6 device-px. Bright pixels get slightly bigger
-      // particles so highlights pop subtly. No additive blow-out.
-      sizes[placed]      = 0.7 + Math.random() * 0.6;
-      bright[placed]     = lum[i];
-      placed++;
+    // Fetch binary — use Buffer transport when available (transparent
+    // Uint8Array on the renderer side, no base64 doubling).
+    let bin;
+    if (window.penelope?.readAssetBinary) {
+      const buf = await window.penelope.readAssetBinary(CLOUD_REL);
+      bin = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    } else {
+      const r = await fetch(new URL('../' + CLOUD_REL, import.meta.url).href);
+      bin = new Uint8Array(await r.arrayBuffer());
     }
-    console.log(`[face] ${placed} particles placed (attempted ${attempts})`);
+    console.log(`[face] binary loaded: ${(bin.byteLength/1024/1024)|0} MB in ${(performance.now()-t0)|0}ms`);
+
+    // Reinterpret directly — no per-particle JS loop
+    const buf = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
+    // Strided typed-array views: each particle is 28 bytes.
+    // We need contiguous attribute arrays for THREE, so we extract.
+    const positions = new Float32Array(N * 3);
+    const colors    = new Uint8Array(N * 3);   // uint8 → normalized in shader
+    const regions   = new Uint8Array(N);
+    const seeds     = new Float32Array(N);
+
+    const f32 = new Float32Array(buf);
+    const u8  = new Uint8Array(buf);
+    const stride32 = RS / 4;
+    for (let i = 0; i < N; i++) {
+      const f = i * stride32;
+      const b = i * RS;
+      // position (3 × float32 at offset 0)
+      positions[i*3]   = f32[f];
+      positions[i*3+1] = f32[f+1];
+      positions[i*3+2] = f32[f+2];
+      // rgb (3 × uint8 at offset 12)
+      colors[i*3]   = u8[b+12];
+      colors[i*3+1] = u8[b+13];
+      colors[i*3+2] = u8[b+14];
+      // region at offset 15
+      regions[i] = u8[b+15];
+      // seed (float32 at offset 20)
+      seeds[i] = f32[f+5];
+    }
+    console.log(`[face] unpacked in ${(performance.now()-t0)|0}ms total`);
 
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, placed*3), 3));
-    geo.setAttribute('aSeed',    new THREE.BufferAttribute(seeds.slice(0, placed), 1));
-    geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes.slice(0, placed), 1));
-    geo.setAttribute('aBright',  new THREE.BufferAttribute(bright.slice(0, placed), 1));
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('aColor',   new THREE.BufferAttribute(colors, 3, true));   // normalized 0..1
+    geo.setAttribute('aRegion',  new THREE.BufferAttribute(regions, 1));
+    geo.setAttribute('aSeed',    new THREE.BufferAttribute(seeds, 1));
 
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -175,119 +150,110 @@ export class PenelopeFace {
       blending: THREE.NormalBlending,
       depthWrite: false,
       vertexShader: `
+        attribute vec3  aColor;
+        attribute float aRegion;
         attribute float aSeed;
-        attribute float aSize;
-        attribute float aBright;
         uniform float uTime;
-        uniform float uBootProgress;
-        uniform float uIntensity;
         uniform float uBreath;
+        uniform float uBlink;
         uniform float uJaw;
         uniform float uMouthOpen;
-        uniform float uBlink;
+        uniform float uMouthWide;
+        uniform float uSmile;
+        uniform float uBrowLift;
+        uniform float uIntensity;
+        uniform float uBootProgress;
+        varying vec3  vColor;
         varying float vGlow;
-        varying float vBright;
         varying float vSeed;
 
         void main() {
           vec3 pos = position;
           float seed = aSeed;
+          float region = aRegion;   // 0=skin 1=eye 2=brow 3=lip 4=nose 6=jaw
 
-          // Subtle whole-face breath
-          pos *= 1.0 + 0.012 * uBreath;
+          // Whole-head breath
+          pos *= 1.0 + 0.008 * uBreath;
 
-          // Sub-pixel kinetic drift — gives the "alive data" feel
-          pos.x += sin(uTime * 0.9 + seed * 11.0) * 0.003;
-          pos.y += cos(uTime * 0.7 + seed * 13.0) * 0.003;
-          pos.z += sin(uTime * 1.1 + seed * 7.0) * 0.002;
+          // Sub-pixel kinetic drift — same seeded sin/cos as the rest of the UI
+          pos.x += sin(uTime * 0.9 + seed * 11.0) * 0.0025;
+          pos.y += cos(uTime * 0.7 + seed * 13.0) * 0.0025;
+          pos.z += sin(uTime * 1.1 + seed *  7.0) * 0.0018;
 
-          // Jaw drop — pull lower-third down on TTS bass
-          float lowerMask = smoothstep(0.0, -0.6, pos.y);
-          pos.y -= (uJaw * 0.04 + uMouthOpen * 0.05) * lowerMask;
+          // ── Blendshape morphs by region ─────────────────────────
+          // EYE region collapses on blink
+          float isEye  = step(0.5, region) * step(region, 1.5);
+          pos.y = mix(pos.y, mix(pos.y, 0.05, 0.7), isEye * uBlink);
 
-          // Blink — collapse eye band
-          float eyeMask = smoothstep(0.06, 0.0, abs(pos.y - 0.18));
-          pos.y = mix(pos.y, 0.18, uBlink * eyeMask);
+          // BROW region lifts up on browLift / surprise
+          float isBrow = step(1.5, region) * step(region, 2.5);
+          pos.y += isBrow * uBrowLift * 0.06;
 
-          // Boot scatter -> assembly: random offsets that fade to base
+          // LIP region: jawOpen pulls lower lip down, smile pulls corners
+          float isLip  = step(2.5, region) * step(region, 3.5);
+          float jawAmt = (uJaw * 0.04 + uMouthOpen * 0.06);
+          // Lower lip = lip particles with y < 0
+          float lowerLip = isLip * smoothstep(0.0, -0.1, pos.y);
+          pos.y -= jawAmt * lowerLip;
+          // Mouth wide stretches lip particles outward
+          pos.x += isLip * uMouthWide * 0.04 * sign(pos.x);
+          // Smile pulls outer lip corners up
+          float cornerMask = isLip * smoothstep(0.25, 0.45, abs(pos.x));
+          pos.y += uSmile * 0.025 * cornerMask;
+
+          // JAW region drops on heavy bass / open mouth
+          float isJaw = step(5.5, region) * step(region, 6.5);
+          pos.y -= isJaw * (uJaw * 0.05 + uMouthOpen * 0.07);
+
+          // ── Boot scatter → converge ─────────────────────────────
           vec3 scattered = position + vec3(
-            (seed - 0.5) * 5.0,
-            (fract(seed * 17.3) - 0.5) * 5.0,
-            (fract(seed * 31.7) - 0.5) * 2.0
+            (seed - 0.5) * 6.0,
+            (fract(seed * 17.3) - 0.5) * 6.0,
+            (fract(seed * 31.7) - 0.5) * 2.5
           );
           float prog = smoothstep(0.0, 1.0, uBootProgress);
-          pos.xy = mix(scattered.xy, pos.xy, prog);
-          pos.z  = mix(scattered.z,  pos.z,  prog);
+          pos = mix(scattered, pos, prog);
 
           vec4 mv = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mv;
+          // Crisp tiny points: ~1px regardless of distance from camera
+          gl_PointSize = (0.9 + 0.7 * uBootProgress) * (140.0 / -mv.z);
 
-          // Tiny crisp points — 0.8-1.6px at full assembly
-          gl_PointSize = aSize * 1.4 * (0.65 + 0.6 * uBootProgress);
-
-          vGlow = uIntensity * (0.5 + 0.5 * seed) * uBootProgress;
-          vBright = aBright;
+          vColor = aColor;
+          vGlow = uIntensity * (0.55 + 0.45 * seed) * uBootProgress;
           vSeed = seed;
         }
       `,
       fragmentShader: `
+        precision highp float;
         uniform vec3 uAccent;
         uniform float uTime;
+        varying vec3  vColor;
         varying float vGlow;
-        varying float vBright;
         varying float vSeed;
         void main() {
-          // Hard tiny dot with very soft edge
           vec2 q = gl_PointCoord - 0.5;
           float d = length(q);
           if (d > 0.5) discard;
           float a = smoothstep(0.5, 0.08, d);
-          // Twinkle: each particle pulses at its own seeded rhythm
-          float twinkle = 0.78 + 0.22 * sin(uTime * 2.4 + vSeed * 25.0);
-          // Brighter particles where the source photo was light (skin
-          // highlights, eyes, teeth). Cap so they don't blow out.
-          vec3 col = uAccent * (0.75 + 0.55 * vBright + 0.55 * vGlow);
-          col += vec3(1.0) * pow(vBright, 5.0) * 0.4;
-          gl_FragColor = vec4(col, a * twinkle * (0.55 + 0.45 * vGlow));
+
+          // Each particle's color = cyan-shifted sample of the source
+          // texture. Highlights pop white-ish, midtones cyan, shadows
+          // deep blue. Keeps the photo recognizable in the cloud.
+          float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
+          vec3 c = uAccent * (0.35 + 1.4 * lum);
+          c += vec3(0.85, 1.0, 1.0) * pow(lum, 5.0) * 0.55;
+
+          // Sub-pixel twinkle
+          float twinkle = 0.75 + 0.25 * sin(uTime * 2.2 + vSeed * 21.0);
+          gl_FragColor = vec4(c * (0.55 + 0.5 * vGlow), a * twinkle * 0.75);
         }
       `,
     });
 
     this.points = new THREE.Points(geo, mat);
     this.scene.add(this.points);
-    // Mark plane as null so the rest of the code knows we're particle-only.
-    this.plane = null;
-  }
-
-  async _loadImage(src) {
-    // Prefer IPC channel (returns base64) — works inside packaged app.
-    if (window.penelope?.readAsset) {
-      try {
-        const b64 = await window.penelope.readAsset(src);
-        if (b64) {
-          const ext = src.split('.').pop().toLowerCase();
-          const mime = ext === 'webp' ? 'image/webp'
-                     : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
-                     : ext === 'png' ? 'image/png' : 'image/*';
-          return await new Promise((res, rej) => {
-            const img = new Image();
-            img.onload = () => res(img);
-            img.onerror = (e) => rej(e);
-            img.src = `data:${mime};base64,${b64}`;
-          });
-        }
-      } catch (e) {
-        console.warn('[face] readAsset failed, falling back to URL:', e);
-      }
-    }
-    // Dev fallback
-    return await new Promise((res, rej) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => res(img);
-      img.onerror = (e) => rej(e);
-      img.src = new URL('../' + src, import.meta.url).href;
-    });
+    console.log(`[face] mesh on GPU. total boot ${(performance.now()-t0)|0}ms`);
   }
 
   _scheduleBlink() {
@@ -331,6 +297,13 @@ export class PenelopeFace {
     this._vMouthWide = v.wide || 0;
   }
 
+  setEmotion(e) {
+    // e = { smile: 0..1, browLift: 0..1 }
+    if (!e) return;
+    if (e.smile != null)    this._vSmile = e.smile;
+    if (e.browLift != null) this._vBrowLift = e.browLift;
+  }
+
   setIdle() {
     this._vJaw = 0; this._vCheek = 0; this._vEye = 0;
     this._vMouthOpen = 0; this._vMouthWide = 0;
@@ -342,12 +315,15 @@ export class PenelopeFace {
     if (mode === 'flirty') {
       this._idleIntensity = 0.78;
       this._breathRate = 0.32;
+      this._vSmile = 0.25; this._vBrowLift = 0.15;
     } else if (mode === 'professional') {
       this._idleIntensity = 0.52;
       this._breathRate = 0.55;
-    } else {
+      this._vSmile = 0; this._vBrowLift = 0;
+    } else {  // warm
       this._idleIntensity = 0.65;
       this._breathRate = 0.45;
+      this._vSmile = 0.12; this._vBrowLift = 0.04;
     }
   }
 
@@ -380,13 +356,11 @@ export class PenelopeFace {
       u.uJaw.value       = lerp(u.uJaw.value,       this._vJaw,       0.25);
       u.uMouthOpen.value = lerp(u.uMouthOpen.value, this._vMouthOpen, 0.35);
       u.uMouthWide.value = lerp(u.uMouthWide.value, this._vMouthWide, 0.25);
+      u.uSmile.value     = lerp(u.uSmile.value,     this._vSmile,     0.06);
+      u.uBrowLift.value  = lerp(u.uBrowLift.value,  this._vBrowLift,  0.06);
       u.uCheek.value     = lerp(u.uCheek.value,     this._vCheek,     0.18);
       u.uEye.value       = lerp(u.uEye.value,       this._vEye,       0.22);
       u.uIntensity.value = lerp(u.uIntensity.value, this._vIntensity, 0.1);
-
-      // Photo opacity follows boot — ramps from 0 to 1 over assembly
-      u.uPhotoOpacity.value = lerp(u.uPhotoOpacity.value,
-                                    u.uBootProgress.value, 0.06);
 
       if (this._bootStart) {
         const elapsed = performance.now() - this._bootStart;

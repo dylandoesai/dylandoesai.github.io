@@ -147,6 +147,16 @@ ipcMain.handle('penelope:readAsset', async (_evt, rel) => {
   return fs.readFileSync(p).toString('base64');
 });
 
+// Binary asset reader — returns raw bytes as a Buffer (Electron's IPC
+// converts Buffer ↔ Uint8Array transparently across the contextBridge).
+// Used for the face-cloud.bin (200+ MB) where base64 transport would
+// triple the memory cost and blow the V8 string heap.
+ipcMain.handle('penelope:readAssetBinary', async (_evt, rel) => {
+  const p = resolveProjectFile(rel);
+  if (!p) return null;
+  return fs.readFileSync(p);
+});
+
 // Deep-link surface — clickable panels in the renderer go through this
 // to open Stripe / Gumroad / YouTube Studio / Calendar.app / Weather.app
 // in the system handler. Restricted to http(s) + safe Apple URL schemes

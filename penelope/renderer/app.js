@@ -330,16 +330,16 @@ function renderSchedule(schedule, todos) {
     }
   }
 
-  // Real text list of today's reminders
+  // Real text list of upcoming reminders (next 7 days)
   const items = (todos?.items || []).slice(0, 8);
   const todo = $('todo-list');
   todo.innerHTML = '';
   if (!items.length) {
-    todo.innerHTML = '<li class="empty">no reminders scheduled today</li>';
+    todo.innerHTML = '<li class="empty">no reminders coming up</li>';
   } else {
     for (const it of items) {
       const li = document.createElement('li');
-      li.innerHTML = `<span class="t">·</span>` +
+      li.innerHTML = `<span class="t">${escapeHtml(it.when || '·')}</span>` +
                      `<span>${escapeHtml(it.text || '')}</span>`;
       li.onclick = () => window.penelope?.openExternal?.('x-apple-reminderkit://');
       todo.appendChild(li);

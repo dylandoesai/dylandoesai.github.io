@@ -1,0 +1,58 @@
+{
+  "count": 8000000,
+  "record_size": 28,
+  "layout": {
+    "pos": {
+      "offset": 0,
+      "type": "float32",
+      "count": 3
+    },
+    "rgb": {
+      "offset": 12,
+      "type": "uint8",
+      "count": 3
+    },
+    "region": {
+      "offset": 15,
+      "type": "uint8",
+      "count": 1
+    },
+    "tri": {
+      "offset": 16,
+      "type": "uint16",
+      "count": 1
+    },
+    "seed": {
+      "offset": 20,
+      "type": "float32",
+      "count": 1
+    },
+    "bary": {
+      "offset": 24,
+      "type": "float16",
+      "count": 2
+    }
+  },
+  "regions": {
+    "0": "skin",
+    "1": "eye",
+    "2": "brow",
+    "3": "lip",
+    "4": "nose",
+    "6": "jaw"
+  },
+  "mesh_bounds": {
+    "x": [
+      -0.3164401650428772,
+      0.37785613536834717
+    ],
+    "y": [
+      -0.2663761377334595,
+      0.7039434909820557
+    ],
+    "z": [
+      -0.2981622517108917,
+      0.15940748155117035
+    ]
+  }
+}

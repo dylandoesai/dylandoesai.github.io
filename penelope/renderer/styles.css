@@ -156,42 +156,78 @@ body.show-cursor { cursor: default; }
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
-/* Readable big number — same cyan glow as the rest of the UI but
-   actually LEGIBLE. No particle stippling. */
+/* Readable big number — same cyan glow as the rest of the UI.
+   No particle stippling (made it unreadable). Instead: bright cyan
+   text with multi-stop glow + a subtle scan-line overlay so it
+   visually matches the hologram material. */
 .m-big-num {
+  position: relative;
+  display: inline-block;
   font-family: var(--mono);
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 200;
   letter-spacing: 0.04em;
-  color: var(--text);
+  color: var(--accent);
   text-shadow:
-    0 0 8px var(--accent-glow),
-    0 0 22px rgba(0, 229, 255, 0.5),
-    0 0 44px rgba(0, 229, 255, 0.2);
+    0 0 6px var(--accent-glow),
+    0 0 18px var(--accent-glow),
+    0 0 44px rgba(0, 229, 255, 0.45),
+    0 0 88px rgba(0, 229, 255, 0.18);
   line-height: 1.05;
   cursor: pointer;
+  /* hologram scanline overlay clipped to the text */
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 229, 255, 0.0) 0px,
+      rgba(0, 229, 255, 0.0) 2px,
+      rgba(0, 0, 0, 0.3)     2px,
+      rgba(0, 0, 0, 0.3)     3px
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: bigNumFlicker 5s ease-in-out infinite;
+}
+@keyframes bigNumFlicker {
+  0%, 100% { opacity: 1; }
+  47%      { opacity: 0.92; }
+  48%      { opacity: 1.0; }
+  72%      { opacity: 0.95; }
 }
 .m-foot {
   font-family: var(--mono); font-size: 10px;
-  letter-spacing: 0.15em; color: var(--text-dim);
+  letter-spacing: 0.18em; color: var(--accent);
+  opacity: 0.65;
   margin-top: 2px;
+  text-shadow: 0 0 6px var(--accent-glow);
 }
 
-/* Simple SVG-shaped CSS bar chart — clearly bars, not blobs */
+/* Particle-stippled hologram bars — vertical streaks of cyan dots,
+   not solid rectangles. Built from layered radial-gradients to keep
+   it CSS-only but match the kinetic face material. */
 .m-bars {
-  display: flex; align-items: flex-end; gap: 4px;
-  height: 36px; margin-top: 6px;
+  display: flex; align-items: flex-end; gap: 6px;
+  height: 44px; margin-top: 8px;
   cursor: pointer;
 }
 .m-bars .bar {
   flex: 1 1 0;
-  min-width: 6px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 229, 255, 0.85),
-    rgba(0, 229, 255, 0.35)
-  );
-  box-shadow: 0 0 6px var(--accent-glow);
+  min-width: 8px;
+  background:
+    /* tiny dot grid */
+    radial-gradient(rgba(0, 229, 255, 0.95) 1px, transparent 1.5px) 0 0 / 4px 4px,
+    radial-gradient(rgba(0, 229, 255, 0.45) 0.6px, transparent 1px) 2px 2px / 4px 4px,
+    /* glow gradient bottom→top */
+    linear-gradient(
+      to top,
+      rgba(0, 229, 255, 0.55) 0%,
+      rgba(0, 229, 255, 0.18) 70%,
+      transparent 100%
+    );
+  box-shadow:
+    0 0 8px rgba(0, 229, 255, 0.55),
+    inset 0 -8px 18px rgba(0, 229, 255, 0.45);
+  border-top: 1px solid var(--accent);
   border-radius: 1px;
 }
 

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('penelope', {
   call: (method, params) => ipcRenderer.invoke('penelope:call', method, params),
   readConfig: (name) => ipcRenderer.invoke('penelope:readConfig', name),
   readAsset: (rel) => ipcRenderer.invoke('penelope:readAsset', rel),
+  readAssetBinary: (rel) => ipcRenderer.invoke('penelope:readAssetBinary', rel),
   showWindow: () => ipcRenderer.invoke('penelope:showWindow'),
   hideWindow: () => ipcRenderer.invoke('penelope:hideWindow'),
   // Open a URL or x-apple-…/weather:// URL scheme in the system handler.

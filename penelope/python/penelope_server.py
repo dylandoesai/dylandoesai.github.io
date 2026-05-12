@@ -242,17 +242,16 @@ async def handle_play_wake_song(_params):
 
 
 async def handle_stop_wake_song(_params):
-    """Fade out the wake song if (and only if) Penelope started it.
+    """No-op. Dylan controls his own Spotify volume.
 
-    If she never started a wake song (because the feature is disabled, or
-    Spotify was already playing Dylan's music), this is a no-op. Critical
-    — fade_out would otherwise zero his existing music's volume and pause it.
+    Earlier this called spotify_ctl.fade_out() to dip the song so the
+    daily-brief TTS would be audible over it — but Dylan explicitly
+    said multiple times "don't touch my music." So this handler now
+    does nothing; the song plays out naturally, the TTS speaks over
+    it, and Dylan decides if he wants to pause Spotify himself.
     """
-    if not STATE.get("_wake_song_active"):
-        return {"ok": False, "reason": "not_active"}
     STATE["_wake_song_active"] = False
-    spotify_ctl.fade_out(duration_s=3.0)
-    return {"ok": True}
+    return {"ok": True, "reason": "hands_off"}
 
 
 async def handle_quick_greeting(_params):
