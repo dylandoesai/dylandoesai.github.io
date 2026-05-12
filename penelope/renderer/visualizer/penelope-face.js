@@ -172,8 +172,24 @@ export class PenelopeFace {
           float seed = aSeed;
           float region = aRegion;   // 0=skin 1=eye 2=brow 3=lip 4=nose 6=jaw
 
-          // Whole-head breath
-          pos *= 1.0 + 0.008 * uBreath;
+          // ── HEAD ROTATION (the 3D feel) ─────────────────────────
+          // Slow continuous yaw (left-right) and pitch (up-down) so the
+          // head is visibly a 3D object in space, not a flat decal.
+          float yaw   = sin(uTime * 0.25) * 0.18;       // ±10°
+          float pitch = sin(uTime * 0.19) * 0.06;       // ±3.5°
+          // Apply rotation around origin BEFORE breath/drift so the
+          // whole head moves as one
+          float cy = cos(yaw),   sy = sin(yaw);
+          float cp = cos(pitch), sp = sin(pitch);
+          // Pitch around X axis
+          vec3 p1 = vec3(pos.x, pos.y * cp - pos.z * sp, pos.y * sp + pos.z * cp);
+          // Yaw around Y axis
+          pos = vec3(p1.x * cy + p1.z * sy, p1.y, -p1.x * sy + p1.z * cy);
+
+          // ── Breath (pronounced — visible scale + tiny float) ────
+          // Whole-head breath scale (visible 2-3% wiggle) + drift up/down
+          pos *= 1.0 + 0.022 * uBreath;
+          pos.y += sin(uTime * 0.45) * 0.012;
 
           // Sub-pixel kinetic drift — same seeded sin/cos as the rest of the UI
           pos.x += sin(uTime * 0.9 + seed * 11.0) * 0.0025;
@@ -216,8 +232,10 @@ export class PenelopeFace {
 
           vec4 mv = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mv;
-          // Crisp tiny points: ~1px regardless of distance from camera
-          gl_PointSize = (0.9 + 0.7 * uBootProgress) * (140.0 / -mv.z);
+          // Fixed-pixel-size tiny points. With 8M particles overlapping
+          // ~30-60 per pixel, even 2px points saturate. Keep them at
+          // 1.0-1.4 px — the DENSITY does the heavy lifting, not size.
+          gl_PointSize = 1.0 + 0.4 * uBootProgress;
 
           vColor = aColor;
           vGlow = uIntensity * (0.55 + 0.45 * seed) * uBootProgress;
@@ -232,21 +250,36 @@ export class PenelopeFace {
         varying float vGlow;
         varying float vSeed;
         void main() {
-          vec2 q = gl_PointCoord - 0.5;
-          float d = length(q);
-          if (d > 0.5) discard;
-          float a = smoothstep(0.5, 0.08, d);
+          // Normal blending — each particle alpha-blends over the
+          // previous. With per-pixel density of ~30-100 particles and
+          // alpha ~0.1, accumulated opacity hits 0.95+ in dense areas
+          // but the per-particle COLOR variation modulates the
+          // resulting pixel — eyes/lips/brows read dark, skin reads
+          // bright cyan.
 
-          // Each particle's color = cyan-shifted sample of the source
-          // texture. Highlights pop white-ish, midtones cyan, shadows
-          // deep blue. Keeps the photo recognizable in the cloud.
           float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
-          vec3 c = uAccent * (0.35 + 1.4 * lum);
-          c += vec3(0.85, 1.0, 1.0) * pow(lum, 5.0) * 0.55;
 
-          // Sub-pixel twinkle
-          float twinkle = 0.75 + 0.25 * sin(uTime * 2.2 + vSeed * 21.0);
-          gl_FragColor = vec4(c * (0.55 + 0.5 * vGlow), a * twinkle * 0.75);
+          // Strong cyan hologram tint with bright highlight pop on
+          // the brightest pixels (forehead, cheekbones, teeth).
+          // Dark photo regions stay almost-black so eyes/lips/hair
+          // read as features and don't melt into the wash.
+          vec3 c = uAccent * (0.03 + 1.8 * lum);
+          // Highlight pop — pushes brightest photo pixels toward white
+          c += vec3(0.7, 1.0, 1.0) * pow(lum, 4.0) * 1.4;
+          // Clamp to avoid pure white blowout but keep highlights pop
+          c = min(c, vec3(2.0));
+
+          // Per-particle twinkle
+          float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + vSeed * 19.0);
+
+          // Per-particle alpha. With 30-50 particles per pixel and 0.10
+          // alpha, accumulated opacity ~0.97 — face fully opaque on the
+          // densest pixels, photo gradient comes through via per-pixel
+          // color variation rather than transparency variation.
+          float alpha = 0.10 * twinkle;
+          alpha *= (0.6 + 0.4 * vGlow);
+
+          gl_FragColor = vec4(c, alpha);
         }
       `,
     });
@@ -257,7 +290,9 @@ export class PenelopeFace {
   }
 
   _scheduleBlink() {
-    const wait = 4000 + Math.random() * 3500;
+    // Real humans blink every ~3-5 sec, sometimes a double-blink. Make
+    // it actually visible — close→open takes 0.28s (cinematic) not 0.16.
+    const wait = 2400 + Math.random() * 2800;
     setTimeout(() => {
       this._blinkT = 0; this._blinking = true;
       this._scheduleBlink();

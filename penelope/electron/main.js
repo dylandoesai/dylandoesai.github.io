@@ -116,7 +116,31 @@ function startPython() {
     },
   });
   py.start();
+
+  // PREVIEW mode: when env PENELOPE_PREVIEW=1 is set, fake a hotword
+  // event 1.5s after Python boots so the face + boot animation runs
+  // without requiring a real wake. Used for design-loop screenshots.
+  // Also skips the wake song (no spotify hijack while iterating).
+  if (process.env.PENELOPE_PREVIEW === '1') {
+    setTimeout(() => {
+      console.log('[preview] firing fake hotword');
+      showWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('penelope:event', {
+          event: 'hotword',
+          data: { phrase: 'papis_home', already_active: false, preview: true },
+        });
+      }
+    }, 1500);
+  }
 }
+
+// Helper: lets `osascript -e 'tell application "Penelope" to ...'` peek
+// at the build version + preview mode for diagnostics.
+ipcMain.handle('penelope:env', () => ({
+  preview: process.env.PENELOPE_PREVIEW === '1',
+  dev: process.env.PENELOPE_DEV === '1',
+}));
 
 ipcMain.handle('penelope:call', async (_evt, method, params) => {
   if (!py) throw new Error('python bridge not ready');
