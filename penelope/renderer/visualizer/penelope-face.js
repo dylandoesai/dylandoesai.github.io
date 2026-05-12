@@ -300,6 +300,23 @@ export class PenelopeFace {
     this._vIntensity = this._idleIntensity != null ? this._idleIntensity : 0.55;
   }
 
+  // Brief blue-particle pulse — used when Dylan clicks an interactive
+  // panel surface. Returns immediately; the face brightens for ~600ms
+  // and the eye + cheek shimmer briefly to acknowledge the click.
+  pulse(strength = 0.35, durationMs = 600) {
+    const prevI = this._vIntensity;
+    const prevE = this._vEye;
+    const prevC = this._vCheek;
+    this._vIntensity = Math.min(1, (prevI || 0.6) + strength);
+    this._vEye = Math.min(1, (prevE || 0) + strength * 0.7);
+    this._vCheek = Math.min(1, (prevC || 0) + strength * 0.4);
+    setTimeout(() => {
+      this._vIntensity = prevI;
+      this._vEye = prevE;
+      this._vCheek = prevC;
+    }, durationMs);
+  }
+
   start() {
     const tick = () => {
       const dt = this.clock.getDelta();

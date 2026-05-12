@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { execSync } = require('node:child_process');
@@ -121,6 +121,24 @@ ipcMain.handle('penelope:readAsset', async (_evt, rel) => {
   const p = path.join(__dirname, '..', rel);
   if (!fs.existsSync(p)) return null;
   return fs.readFileSync(p).toString('base64');
+});
+
+// Deep-link surface — clickable panels in the renderer go through this
+// to open Stripe / Gumroad / YouTube Studio / Calendar.app / Weather.app
+// in the system handler. Restricted to http(s) + safe Apple URL schemes
+// to keep the renderer from being able to fire arbitrary local commands.
+const ALLOWED_SCHEMES = ['https:', 'http:', 'ical:', 'message:',
+                         'x-apple-reminderkit:', 'weather:', 'spotify:',
+                         'stremio:'];
+ipcMain.handle('penelope:openExternal', async (_evt, url) => {
+  try {
+    const u = new URL(url);
+    if (!ALLOWED_SCHEMES.includes(u.protocol)) return false;
+    await shell.openExternal(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
 });
 
 // macOS power-event handling — spec said quit on sleep, relaunch on wake.

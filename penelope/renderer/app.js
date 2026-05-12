@@ -213,12 +213,29 @@ function scheduleVisemes(visemes, audioEl) {
   step();
 }
 
+// Weather widget is rendered into #weather-now by refreshPanels; clicking
+// pulses the face and opens Apple's Weather.app (weather:// scheme).
+async function refreshWeatherWidget(weatherEvt) {
+  const el = document.getElementById('weather-now');
+  if (!el || !weatherEvt) return;
+  const t = weatherEvt.temp_f ?? weatherEvt.temperature_f ?? '?';
+  const c = weatherEvt.condition || weatherEvt.source || '';
+  const src = weatherEvt.source ? ` · ${weatherEvt.source}` : '';
+  el.innerHTML = `<div class="big">${t}°F</div><div>${c}${src}</div>`;
+  el.style.cursor = 'pointer';
+  el.title = 'Open Weather.app';
+  el.onclick = () => {
+    if (state.face && state.face.pulse) state.face.pulse(0.35);
+    if (window.penelope?.openExternal) window.penelope.openExternal('weather://');
+  };
+}
+
 async function refreshPanels() {
   // Prefer LIVE data from the Python sidecar (brain.gather_revenue +
   // gather_analytics + apple_cal.today_events + apple_reminders.scheduled_today).
   // Fall back to the static JSON files if the bridge isn't ready (boot,
   // first render before start() returns).
-  let revenue, analytics, schedule, todos;
+  let revenue, analytics, schedule, todos, weather;
   try {
     const live = await window.penelope.call('get_panel_data', {});
     if (live) {
@@ -226,6 +243,7 @@ async function refreshPanels() {
       analytics = live.analytics;
       schedule = live.schedule;
       todos = live.todos;
+      weather = live.weather;
     }
   } catch (e) {
     console.warn('panel live-data failed, falling back to JSON', e);
@@ -238,6 +256,7 @@ async function refreshPanels() {
   if (revenue) renderRevenue(revenue);
   if (analytics) renderAnalytics(analytics);
   if (schedule || todos) renderSchedule(schedule || { events: [] }, todos || { items: [] });
+  if (weather) refreshWeatherWidget(weather);
 }
 
 function handleAlert(alert) {
@@ -267,11 +286,17 @@ function tickClock() {
   $('clock').textContent = `${hh}:${mm}:${ss} ${ampm}`;
 }
 
-// Devtools helpers
+// Devtools + interactive helpers used by clickable panels.
 window.penelopeDev = {
   reloadData: refreshPanels,
   fakeWake: () => handleWake({}),
   scatter: () => { state.face.uniforms.uBootProgress.value = 0; },
+  // Brief particle pulse triggered when Dylan clicks a panel surface.
+  pulse: (strength = 0.35) => {
+    if (state.face && typeof state.face.pulse === 'function') {
+      state.face.pulse(strength);
+    }
+  },
 };
 
 boot().catch(e => {

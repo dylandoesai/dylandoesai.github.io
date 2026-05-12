@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('penelope', {
   readAsset: (rel) => ipcRenderer.invoke('penelope:readAsset', rel),
   showWindow: () => ipcRenderer.invoke('penelope:showWindow'),
   hideWindow: () => ipcRenderer.invoke('penelope:hideWindow'),
+  // Open a URL or x-apple-…/weather:// URL scheme in the system handler.
+  // Used by the clickable panels (revenue / analytics / schedule / weather)
+  // to deep-link into the source dashboard or native app.
+  openExternal: (url) => ipcRenderer.invoke('penelope:openExternal', url),
   on: (channel, handler) => {
     const listener = (_evt, payload) => handler(payload);
     ipcRenderer.on(channel, listener);

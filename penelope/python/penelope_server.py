@@ -240,8 +240,14 @@ async def handle_get_panel_data(_params):
     an_task = asyncio.create_task(brain.gather_analytics())
     cal_task = loop.run_in_executor(None, apple_cal.today_events)
     rem_task = loop.run_in_executor(None, apple_reminders.scheduled_today)
+    cfg_for_wx = STATE.get("config") or config_loader.load()
+    wx_task = asyncio.create_task(weather.current(cfg_for_wx.get("weather_location")))
     rev = await rev_task
     analytics = await an_task
+    try:
+        wx = await wx_task
+    except Exception:
+        wx = {}
     try:
         cal_events = await cal_task
     except Exception:
@@ -265,6 +271,7 @@ async def handle_get_panel_data(_params):
         "analytics": analytics,
         "schedule": schedule,
         "todos": todos,
+        "weather": wx,
     }
 
 

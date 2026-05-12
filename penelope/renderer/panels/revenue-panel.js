@@ -1,41 +1,71 @@
 // Revenue panel: totals, per-source breakdown, sparkline chart.
+// Now clickable — each row deep-links to the source dashboard and pulses
+// the face on click.
+//
 // Data shape (config/revenue.json):
 //   {
-//     "total_today": 1234.50,
-//     "total_mtd": 23450.10,
-//     "total_ytd": 198320.00,
-//     "currency": "USD",
-//     "series_daily": [120, 180, 210, ...]   // last ~30 days
-//     "sources": [
-//       {"name": "Stripe", "today": 800, "mtd": 14000},
-//       {"name": "Gumroad", "today": 220, "mtd": 4500},
-//       {"name": "AdSense", "today": 214.50, "mtd": 4950.10}
-//     ]
+//     "total_today": 1234.50, "total_mtd": ..., "total_ytd": ...,
+//     "currency": "USD", "series_daily": [...],
+//     "sources": [{"name": "Stripe", "today": 800, "mtd": 14000}, ...]
 //   }
+
+const SOURCE_URLS = {
+  Stripe:     'https://dashboard.stripe.com/',
+  Gumroad:    'https://app.gumroad.com/dashboard',
+  AdSense:    'https://adsense.google.com/',
+  ElevenLabs: 'https://elevenlabs.io/app/voice-lab',
+};
+
+function openUrl(url) {
+  if (!url) return;
+  // electron preload exposes openExternal; renderer-only fallback to window.open
+  if (window.penelope?.openExternal) window.penelope.openExternal(url);
+  else window.open(url, '_blank');
+}
+
+function pulse() {
+  if (window.penelopeDev?.pulse) window.penelopeDev.pulse();
+}
 
 export function renderRevenue(data) {
   const fmt = new Intl.NumberFormat('en-US', {
     style: 'currency', currency: data.currency || 'USD',
     maximumFractionDigits: 0,
   });
-  document.getElementById('revenue-total').textContent =
-    fmt.format(data.total_today || 0);
 
-  drawSparkline(document.getElementById('revenue-chart'),
-                data.series_daily || []);
+  const totalEl = document.getElementById('revenue-total');
+  totalEl.textContent = fmt.format(data.total_today || 0);
+  totalEl.style.cursor = 'pointer';
+  totalEl.title = 'Open Stripe dashboard';
+  totalEl.onclick = () => { pulse(); openUrl(SOURCE_URLS.Stripe); };
+
+  const chart = document.getElementById('revenue-chart');
+  drawSparkline(chart, data.series_daily || []);
+  chart.style.cursor = 'pointer';
+  chart.title = 'Click to open Stripe Express dashboard';
+  chart.onclick = () => { pulse(); openUrl('https://connect.stripe.com/express_login'); };
 
   const list = document.getElementById('revenue-list');
   list.innerHTML = '';
   list.appendChild(li('MTD', fmt.format(data.total_mtd || 0)));
   list.appendChild(li('YTD', fmt.format(data.total_ytd || 0)));
   for (const s of (data.sources || [])) {
-    list.appendChild(li(s.name, fmt.format(s.today || 0)));
+    const url = SOURCE_URLS[s.name];
+    list.appendChild(li(s.name, fmt.format(s.today || 0), url));
   }
 }
 
-function li(k, v) {
+function li(k, v, url) {
   const el = document.createElement('li');
   el.innerHTML = `<span>${k}</span><b>${v}</b>`;
+  if (url) {
+    el.style.cursor = 'pointer';
+    el.title = `Open ${k} dashboard`;
+    el.onclick = () => { pulse(); openUrl(url); };
+    el.addEventListener('mouseenter', () =>
+      el.style.boxShadow = 'inset 0 0 0 1px rgba(0,229,255,0.4)');
+    el.addEventListener('mouseleave', () => el.style.boxShadow = '');
+  }
   return el;
 }
 
@@ -63,7 +93,6 @@ function drawSparkline(canvas, points) {
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
   ctx.stroke();
-  // gradient fill underneath
   ctx.lineTo(w - pad, h - pad);
   ctx.lineTo(pad, h - pad);
   ctx.closePath();
