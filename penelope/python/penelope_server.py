@@ -80,13 +80,35 @@ def log(*args) -> None:
     print(*args, file=sys.stderr, flush=True)
 
 
+# File logger — Penelope's .app stderr goes to /dev/null when launched
+# from Finder, so we also write critical lifecycle events to a known path.
+_LOG_FILE = Path.home() / "Library" / "Logs" / "Penelope" / "sidecar.log"
+try:
+    _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+def _log_file(msg: str) -> None:
+    log(f"[server] {msg}")
+    try:
+        with open(_LOG_FILE, "a") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] [server] {msg}\n")
+    except Exception:
+        pass
+
+
 # ----- RPC handlers --------------------------------------------------------
 
 async def handle_start(_params):
+    # Always log this — it's the canonical signal that the renderer is
+    # alive and reaching the sidecar.
+    _log_file("handle_start called")
     if STATE["active"]:
+        _log_file("handle_start: already active, returning")
         return {"ok": True}
     STATE["config"] = config_loader.load()
     log("config loaded")
+    _log_file("config loaded, spawning subsystems")
 
     # boot proactive scheduler
     proactive.start(STATE, emit)

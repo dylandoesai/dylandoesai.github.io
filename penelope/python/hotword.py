@@ -35,8 +35,51 @@ import sounddevice as sd
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# File logger — when Penelope is launched via Finder, stderr goes to
+# /dev/null. We tee every hotword diagnostic line to a known path so
+# `tail -f ~/Library/Logs/Penelope/sidecar.log` is always available.
+_LOG_PATH = Path.home() / "Library" / "Logs" / "Penelope" / "sidecar.log"
+try:
+    _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+def _log(msg: str) -> None:
+    line = f"[hotword] {msg}"
+    print(line, file=sys.stderr, flush=True)
+    try:
+        with open(_LOG_PATH, "a") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] {line}\n")
+    except Exception:
+        pass
+
+
+class _TeeStderr:
+    """Write to both real stderr AND the log file. Installed in run() so
+    every existing `print(..., file=sys.stderr)` automatically lands in
+    the file too — no rewrites needed."""
+    def __init__(self, real, path):
+        self._real = real
+        self._path = path
+    def write(self, s):
+        try: self._real.write(s)
+        except Exception: pass
+        try:
+            with open(self._path, "a") as f:
+                if s.strip():
+                    f.write(f"[{time.strftime('%H:%M:%S')}] {s.rstrip()}\n")
+        except Exception:
+            pass
+    def flush(self):
+        try: self._real.flush()
+        except Exception: pass
+
 
 def run(state: dict, on_detect):
+    # Tee stderr -> file so every print(...) is also recorded for tail -f
+    if not isinstance(sys.stderr, _TeeStderr):
+        sys.stderr = _TeeStderr(sys.stderr, str(_LOG_PATH))
+    _log("run() started")
     cfg = state.get("config") or {}
     key = cfg.get("picovoice_access_key")
     papi_ppn = ROOT / "assets" / "papis_home_mac.ppn"
@@ -96,7 +139,14 @@ def _run_whisper_fallback(on_detect):
     # short consonant bursts ("p-p-papi") that would otherwise be lost.
     PEAK_GATE = 0.05
     buf = np.zeros(int(sr * window), dtype=np.float32)
-    require_owner = voice_id.owner_enrolled()
+    # Voice-ID is intentionally OFF for the wake stage. The enrolled
+    # embedding (from a 75-min studio reference clip) doesn't transfer
+    # cleanly to the MacBook Air built-in mic — sims bounce between 0.38
+    # and 0.66 for the same speaker. Blocking the wake on it makes the
+    # app unusable. Voice-ID is still available for stricter post-wake
+    # gates (sending messages, spending money) where the user has time
+    # to speak a longer phrase for a stable embedding.
+    require_owner = False
     print(f"[hotword] whisper ready. voice_id gate={require_owner} "
           f"energy_thresh={ENERGY_GATE} peak_thresh={PEAK_GATE}",
           file=sys.stderr, flush=True)
@@ -163,7 +213,8 @@ def _run_whisper_fallback(on_detect):
                 is_owner, sim = voice_id.is_owner(buf.copy())
                 if not is_owner:
                     print(f"[hotword] MATCHED '{which}' but voice-id rejected "
-                          f"(sim={sim:.2f}, threshold=0.72) — adjust or re-enroll",
+                          f"(sim={sim:.2f}, threshold={voice_id.threshold():.2f}) "
+                          f"— adjust or re-enroll",
                           file=sys.stderr, flush=True)
                     continue
                 print(f"[hotword] voice-id OK (sim={sim:.2f})",
