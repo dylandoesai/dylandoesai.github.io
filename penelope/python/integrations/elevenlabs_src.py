@@ -40,11 +40,20 @@ def _fetch_sync(cfg: dict):
     except ImportError:
         return None
 
+    # Pull the cached past-month dollars from the daily scraper output —
+    # the API doesn't expose voice-library earnings, but the Recharts
+    # scraper writes them into config/revenue.json on every run.
+    rev = cfg.get("revenue") or {}
+    el_cached = (rev.get("elevenlabs_voice_library") or {})
+    mtd_usd = float(el_cached.get("financial_rewards_past_month_usd") or 0)
+
     headers = {"xi-api-key": key}
-    out = {"today": 0, "mtd": 0,
+    out = {"today": 0, "mtd": round(mtd_usd, 2),
            "voice_id": vid,
            "voice_name": el.get("voice_name", ""),
-           "note": "Earnings dashboard-only; see elevenlabs.io/app/voice-library/earnings"}
+           "scraped_past_month_usd": mtd_usd,
+           "scraped_at": el_cached.get("scraped_at"),
+           "note": "today=0 because ElevenLabs doesn't expose daily earnings; mtd = past-month total from latest dashboard scrape"}
 
     try:
         r = requests.get(
