@@ -167,20 +167,29 @@ def ensure_work_calendar() -> bool:
 def create_event(title: str, start: dt.datetime, end: dt.datetime | None = None,
                  calendar: str = "Calendar", location: str = "",
                  notes: str = "") -> bool:
-    """Create an event on the named calendar. Default calendar is 'Calendar'.
-    end defaults to start + 1h if not provided."""
+    """Create an event via AppleScript with an unambiguous date format.
+
+    Uses 'M/D/YYYY at h:MM:SS AM/PM' — AppleScript's date() parser
+    handles this reliably. (24-hour 'M/D/YYYY HH:MM' silently created
+    all-day events on first push — bug fixed here.)"""
     if end is None:
         end = start + dt.timedelta(hours=1)
-    safe_t = title.replace('"', '\\"')
-    safe_l = location.replace('"', '\\"')
-    safe_n = notes.replace('"', '\\"')
+    safe_t = title.replace('"', '\\"').replace('\\', '\\\\')
+    safe_l = (location or "").replace('"', '\\"').replace('\\', '\\\\')
+    safe_n = (notes or "").replace('"', '\\"').replace('\\', '\\\\')
     safe_c = calendar.replace('"', '\\"')
-    s = start.strftime("%m/%d/%Y %I:%M %p").lstrip("0")
-    e = end.strftime("%m/%d/%Y %I:%M %p").lstrip("0")
+
+    def fmt(d: dt.datetime) -> str:
+        return d.strftime("%-m/%-d/%Y %-I:%M:%S %p")
+
+    s_str = fmt(start)
+    e_str = fmt(end)
     script = f'''
         tell application "Calendar"
             tell calendar "{safe_c}"
-                make new event with properties {{summary:"{safe_t}", start date:date "{s}", end date:date "{e}", location:"{safe_l}", description:"{safe_n}"}}
+                set startD to date "{s_str}"
+                set endD to date "{e_str}"
+                make new event with properties {{summary:"{safe_t}", start date:startD, end date:endD, location:"{safe_l}", description:"{safe_n}"}}
             end tell
         end tell
     '''
@@ -192,23 +201,67 @@ def create_event(title: str, start: dt.datetime, end: dt.datetime | None = None,
         return False
 
 
-def push_shift_schedule(cfg: dict, days_ahead: int = 30) -> dict:
+def _purge_calendar(calendar_name: str, days_window: int = 60) -> int:
+    """Delete every event on `calendar_name` within ±days_window via
+    AppleScript. EventKit write needs explicit Events permission that
+    we don't reliably have; AppleScript Automation is already granted."""
+    safe = calendar_name.replace('"', '\\"')
+    script = f'''
+        tell application "Calendar"
+            tell calendar "{safe}"
+                set N to count of events
+                delete every event
+                return N
+            end tell
+        end tell
+    '''
+    try:
+        r = subprocess.run(["osascript", "-e", script],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            try: return int(r.stdout.strip())
+            except ValueError: return 0
+    except Exception:
+        pass
+    return 0
+
+
+def push_shift_schedule(cfg: dict, days_ahead: int = 30,
+                        wipe_existing: bool = True) -> dict:
     """Push the next `days_ahead` work days from work_schedule.json into the
-    Penelope · Work calendar. Idempotent: skips dates already on that
-    calendar with a matching summary."""
-    import shift_state  # avoid circular at top
+    Penelope · Work calendar — including shift events themselves AND the
+    wake-up + leave-for-work events (5:00 AM/5:25 AM for days,
+    5:00 PM/5:25 PM for nights).
+
+    wipe_existing=True deletes existing Penelope · Work events first so
+    re-runs always reflect the latest work_schedule.json + routine config.
+
+    Uses EventKit for reliable date handling (AppleScript's `date "5/13/2026
+    18:45"` parser silently created all-day events on the first push)."""
+    import shift_state
     if not ensure_work_calendar():
         return {"ok": False, "reason": "could not create calendar"}
+    if wipe_existing:
+        _purge_calendar(WORK_CAL, days_window=max(days_ahead + 5, 60))
 
     ws = cfg.get("work_schedule") or {}
     times = ws.get("shift_times") or {
-        "day":   {"start": "07:00", "end": "19:00"},
-        "night": {"start": "19:00", "end": "07:00"},
+        "day":   {"start": "06:45", "end": "18:45"},
+        "night": {"start": "18:45", "end": "06:45"},
     }
+    routine = ws.get("routine") or {
+        "wake_for_day":    "05:00",
+        "leave_for_day":   "05:25",
+        "wake_for_night":  "17:00",
+        "leave_for_night": "17:25",
+    }
+
+    def hhmm(s: str) -> dt.time:
+        h, m = s.split(":")
+        return dt.time(int(h), int(m))
 
     today = dt.date.today()
     added = 0
-    skipped = 0
     failed = 0
     for n in range(days_ahead):
         d = today + dt.timedelta(days=n)
@@ -216,45 +269,46 @@ def push_shift_schedule(cfg: dict, days_ahead: int = 30) -> dict:
         if letter not in ("D", "N"):
             continue
         kind = "day" if letter == "D" else "night"
-        start = times[kind]["start"]
-        end = times[kind]["end"]
-        # Night shift ends the next morning
-        end_offset = 1 if kind == "night" else 0
-        end_date = d + dt.timedelta(days=end_offset)
         title = f"O-I Kalama — {'Day' if kind == 'day' else 'Night'} shift"
 
-        date_str_start = f"{d.month}/{d.day}/{d.year} {start}"
-        date_str_end = f"{end_date.month}/{end_date.day}/{end_date.year} {end}"
+        start_t = hhmm(times[kind]["start"])
+        end_t = hhmm(times[kind]["end"])
+        start_dt = dt.datetime.combine(d, start_t)
+        end_dt = dt.datetime.combine(
+            d + (dt.timedelta(days=1) if kind == "night" else dt.timedelta()),
+            end_t,
+        )
 
-        # Skip if already there
-        check_script = f'''
-            tell application "Calendar"
-                tell calendar "{WORK_CAL}"
-                    set startD to date "{date_str_start}"
-                    set endD to startD + (60 * 60)
-                    set existing to (every event whose start date >= startD and start date < endD)
-                    return (count of existing)
-                end tell
-            end tell
-        '''
-        rc, out, err = _osa(check_script, timeout=15)
-        if rc == 0 and out.strip().isdigit() and int(out.strip()) > 0:
-            skipped += 1
-            continue
-
-        create_script = f'''
-            tell application "Calendar"
-                tell calendar "{WORK_CAL}"
-                    set startD to date "{date_str_start}"
-                    set endD to date "{date_str_end}"
-                    make new event with properties {{summary:"{title}", start date:startD, end date:endD, location:"O-I Kalama Glass Plant"}}
-                end tell
-            end tell
-        '''
-        rc, _, err = _osa(create_script, timeout=15)
-        if rc == 0:
+        # 1. Shift event itself
+        if create_event(title, start_dt, end_dt,
+                        calendar=WORK_CAL,
+                        location="O-I Kalama Glass Plant",
+                        notes="Auto-created by Penelope from work_schedule.json"):
             added += 1
         else:
             failed += 1
-    return {"ok": True, "added": added, "skipped": skipped, "failed": failed,
+
+        # 2. Wake-up event
+        wake_t = hhmm(routine[f"wake_for_{kind}"])
+        wake_dt = dt.datetime.combine(d, wake_t)
+        if create_event(f"Wake up for {kind} shift", wake_dt,
+                        wake_dt + dt.timedelta(minutes=15),
+                        calendar=WORK_CAL,
+                        notes="Penelope will start gently waking you up around now."):
+            added += 1
+        else:
+            failed += 1
+
+        # 3. Leave-for-work event
+        leave_t = hhmm(routine[f"leave_for_{kind}"])
+        leave_dt = dt.datetime.combine(d, leave_t)
+        if create_event(f"Leave for {kind} shift", leave_dt,
+                        leave_dt + dt.timedelta(minutes=10),
+                        calendar=WORK_CAL,
+                        notes="Penelope will nudge you out the door."):
+            added += 1
+        else:
+            failed += 1
+
+    return {"ok": True, "added": added, "failed": failed,
             "days_window": days_ahead}
