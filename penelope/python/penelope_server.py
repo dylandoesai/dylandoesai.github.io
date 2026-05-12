@@ -97,6 +97,7 @@ async def handle_start(_params):
     # boot hotword listener in background
     threading.Thread(target=hotword.run,
                      args=(STATE, on_hotword),
+                     name="hotword",
                      daemon=True).start()
     emit("log", {"msg": "hotword listening"})
     return {"ok": True}
@@ -324,6 +325,66 @@ async def handle_get_panel_data(_params):
     }
 
 
+async def handle_mic_diagnose(_params):
+    """Probe the mic without committing to the long-running hotword loop.
+
+    Returns:
+      devices: every input device sounddevice can see (name, sr, channels)
+      default_input: the OS-selected default
+      open_test: result of trying to open a 1-sec InputStream
+                 ("ok"          -> permission granted, mic readable
+                  "perm_denied" -> macOS TCC denied / never prompted
+                  "<other>"      -> exception text, e.g. device busy)
+      energy: mean abs energy over the 1-sec capture if open succeeded
+      hotword_thread_alive: whether the background hotword loop is running
+    """
+    import sounddevice as sd
+    result = {
+        "devices": [],
+        "default_input": None,
+        "open_test": None,
+        "energy": None,
+        "hotword_thread_alive": False,
+    }
+    try:
+        for i, d in enumerate(sd.query_devices()):
+            if d.get("max_input_channels", 0) > 0:
+                result["devices"].append({
+                    "index": i,
+                    "name": d.get("name"),
+                    "sr": d.get("default_samplerate"),
+                    "channels": d.get("max_input_channels"),
+                })
+        di = sd.query_devices(kind="input")
+        result["default_input"] = {
+            "name": di.get("name"),
+            "sr": di.get("default_samplerate"),
+        }
+    except Exception as e:
+        result["devices_error"] = repr(e)
+
+    # 1-second mic capture probe — this is what triggers the TCC prompt
+    try:
+        rec = sd.rec(16000, samplerate=16000, channels=1, dtype="float32")
+        sd.wait()
+        import numpy as np
+        result["energy"] = float(np.abs(rec).mean())
+        result["open_test"] = "ok"
+    except Exception as e:
+        msg = repr(e)
+        if "permission" in msg.lower() or "denied" in msg.lower() or "-50" in msg:
+            result["open_test"] = "perm_denied"
+        else:
+            result["open_test"] = msg
+
+    # Is the hotword loop actually running?
+    for t in threading.enumerate():
+        if t.name.startswith("hotword") or "hotword" in str(t._target).lower():
+            result["hotword_thread_alive"] = t.is_alive()
+            break
+    return result
+
+
 HANDLERS = {
     "start": handle_start,
     "daily_brief": handle_daily_brief,
@@ -337,6 +398,7 @@ HANDLERS = {
     "shutdown": handle_shutdown,
     "get_panel_data": handle_get_panel_data,
     "text_message": handle_text_message,
+    "mic_diagnose": handle_mic_diagnose,
 }
 
 

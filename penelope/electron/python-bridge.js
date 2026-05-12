@@ -3,7 +3,25 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const readline = require('node:readline');
+
+// Persistent log file. When Penelope is launched from Finder (the
+// only supported launch path per spec), Electron's stdout/stderr go
+// to /dev/null — so without this file we have zero visibility into
+// the Python sidecar's hotword diagnostics. Path is stable across
+// runs so a tail -f works.
+const LOG_PATH = path.join(os.homedir(), 'Library', 'Logs', 'Penelope', 'sidecar.log');
+try {
+  fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+} catch {}
+let _logStream = null;
+function logToFile(line) {
+  try {
+    if (!_logStream) _logStream = fs.createWriteStream(LOG_PATH, { flags: 'a' });
+    _logStream.write(`[${new Date().toISOString()}] ${line}\n`);
+  } catch {}
+}
 
 // JSON-RPC over stdio. Each line of stdout is one JSON object.
 // Requests sent to stdin look like {"id": N, "method": "...", "params": {...}}
@@ -77,13 +95,18 @@ class PythonBridge {
 
     this.proc.stderr.on('data', (buf) => {
       const s = buf.toString();
-      s.split('\n').filter(Boolean).forEach((l) => this.onLog(l));
+      s.split('\n').filter(Boolean).forEach((l) => {
+        this.onLog(l);
+        logToFile(`[py-stderr] ${l}`);
+      });
     });
 
     this.proc.on('exit', (code) => {
       this.onLog(`python exited (${code})`);
+      logToFile(`[py-exit] code=${code}`);
       this.onEvent({ event: 'python_exit', data: { code } });
     });
+    logToFile(`[py-spawn] ${py} ${script} (cwd=${cwd})`);
   }
 
   handleLine(line) {
