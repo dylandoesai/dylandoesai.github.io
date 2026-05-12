@@ -134,6 +134,11 @@ async def _call_claude(prompt: str, sys_prompt: str) -> str:
         return _offline_response(prompt)
     # We use `claude --print` for a single-shot response. `--model` selects
     # Opus 4.7. `--append-system-prompt` prepends Penelope's persona.
+    # Grant her read access to Dylan's main project memory so she can
+    # pull deeper context about him on demand. Her own auto-memory writes
+    # land in the standard ~/.claude/projects/<flattened-cwd>/memory/ dir.
+    dev_memory = os.path.expanduser(
+        "~/.claude/projects/-Users-dylanireland/memory")
     args = [
         CLAUDE_BIN, "--print", "--model", CLAUDE_MODEL,
         "--append-system-prompt", sys_prompt,
@@ -142,6 +147,8 @@ async def _call_claude(prompt: str, sys_prompt: str) -> str:
         # we'll re-spawn with broader permissions.
         "--allowedTools", "Read,Write,Edit,Bash,WebFetch",
     ]
+    if os.path.isdir(dev_memory):
+        args.extend(["--add-dir", dev_memory])
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdin=asyncio.subprocess.PIPE,
