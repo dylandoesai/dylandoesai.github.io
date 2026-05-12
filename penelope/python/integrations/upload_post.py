@@ -1,34 +1,35 @@
-"""upload-post.com API client.
+"""upload-post.com analytics client.
 
-upload-post.com gives one API + one nickname per platform-account
-connection. With 7 channels x 5 platforms (YouTube, TikTok, Instagram,
-Facebook, X) you'll have up to 35 separate connections, each with its
-own nickname.
+API base + auth:
+    GET https://api.upload-post.com/api/analytics/{profile_username}
+        ?platforms=youtube,tiktok,instagram,facebook,x
+    Authorization: Apikey <jwt>
 
-Source of truth for what to fetch is config/channels.json. Schema:
-
+Single call returns 28-day-window stats per requested platform:
     {
-      "channels": [
-        { "id": 1, "name": "channel-1",
-          "platforms": {
-            "youtube":   { "handle": "@a",  "upload_post_nickname": "ch1-yt" },
-            "tiktok":    { "handle": "@aa", "upload_post_nickname": "ch1-tt" },
-            "instagram": { "handle": "@a",  "upload_post_nickname": "ch1-ig" },
-            "facebook":  { "handle": "a",   "upload_post_nickname": "ch1-fb" },
-            "x":         { "handle": "@A",  "upload_post_nickname": "ch1-x"  }
-          }
-        },
-        ...
-      ]
+      "<platform>": {
+        "followers": int,
+        "reach": int,
+        "impressions": int,
+        "likes": int,
+        "comments": int,
+        "shares": int,
+        "saves": int,
+        "profileViews": int,
+        "reach_timeseries": [{"date": "YYYY-MM-DD", "value": int}, ...],
+      },
+      ...
     }
 
-Handles can differ per platform per channel (that's the whole point of
-the per-platform record). Anything with an empty upload_post_nickname
-is skipped.
+One nickname per upload-post profile covers all five of that channel's
+social accounts, so we make one call per channel (7 calls for the
+network, not 35).
 
-This module aggregates analytics per platform across all channels for
-the side panels, and also returns per-channel breakdowns Penelope can
-draw on for the daily brief.
+Channel-to-nickname mapping comes from config/channels.json. We collect
+the distinct upload_post_nickname per channel and call the API once.
+
+Endpoint discovered via the OpenAPI spec at
+https://docs.upload-post.com/openapi.json (2026-05-11).
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ import concurrent.futures
 
 import requests
 
-API_BASE = "https://api.upload-post.com/api"
+API = "https://api.upload-post.com/api"
 PLATFORMS = ("youtube", "tiktok", "instagram", "facebook", "x")
 
 
@@ -57,30 +58,32 @@ def _fetch_sync(cfg: dict) -> dict:
 
     headers = {"Authorization": f"Apikey {api_key}"}
 
-    # Build the (channel, platform, nickname) work list
+    # One call per channel — the upload_post nickname is shared across
+    # platforms for a given channel, so a single GET pulls all 5 buckets.
     jobs = []
     for ch in channels:
         name = ch.get("name") or f"channel-{ch.get('id','?')}"
-        for platform in PLATFORMS:
-            p = (ch.get("platforms") or {}).get(platform) or {}
-            nick = p.get("upload_post_nickname")
-            if not nick:
-                continue
-            jobs.append({
-                "channel": name,
-                "platform": platform,
-                "handle": p.get("handle") or "",
-                "nickname": nick,
-            })
+        platforms_map = ch.get("platforms") or {}
+        nick = None
+        for p in PLATFORMS:
+            n = (platforms_map.get(p) or {}).get("upload_post_nickname")
+            if n:
+                nick = n; break
+        if not nick:
+            continue
+        handles = {p: (platforms_map.get(p) or {}).get("handle") or ""
+                   for p in PLATFORMS}
+        jobs.append({"channel": name, "nickname": nick, "handles": handles})
 
-    # Fetch them in parallel (up to 8 at a time)
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as ex:
         futs = {ex.submit(_fetch_one, headers, j): j for j in jobs}
         for f in concurrent.futures.as_completed(futs):
             j = futs[f]
-            try: data = f.result()
-            except Exception as e: data = {"error": str(e)}
+            try:
+                data = f.result()
+            except Exception as e:
+                data = {"error": str(e)}
             results.append({**j, "data": data})
 
     return _shape_for_panels(results)
@@ -88,43 +91,65 @@ def _fetch_sync(cfg: dict) -> dict:
 
 def _fetch_one(headers, job):
     r = requests.get(
-        f"{API_BASE}/analytics",
+        f"{API}/analytics/{job['nickname']}",
         headers=headers,
-        params={"nickname": job["nickname"], "platform": job["platform"]},
-        timeout=10,
+        params={"platforms": ",".join(PLATFORMS)},
+        timeout=12,
     )
     r.raise_for_status()
     return r.json() or {}
 
 
+def _last_value(ts):
+    if not isinstance(ts, list) or not ts:
+        return 0
+    return ts[-1].get("value", 0) or 0
+
+
+def _sum_values(ts, days=None):
+    if not isinstance(ts, list):
+        return 0
+    src = ts[-days:] if days else ts
+    return sum((p.get("value", 0) or 0) for p in src)
+
+
 def _shape_for_panels(results: list) -> dict:
-    """Bucket per-channel-per-platform results into the shape the side
-    panels expect (YT and TT each get a 'channels' list + agg series)."""
+    """Bucket results into the per-platform shape the renderer expects."""
     out = {p: {"channels": [], "series_views": []} for p in PLATFORMS}
     series_by_platform = {p: [] for p in PLATFORMS}
 
     for r in results:
-        p = r["platform"]; d = r.get("data") or {}
-        out[p]["channels"].append({
-            # canonical brand name (= YouTube channel name) -- always
-            # the same across platform buckets for the same channel
-            "name": r["channel"],
-            # the actual @handle on THIS platform (may differ across
-            # platforms for the same brand)
-            "platform_handle": r["handle"],
-            "subs": d.get("followers", d.get("subscribers", 0)),
-            "views_today": d.get("views_24h", 0),
-            "views_28d": d.get("views_28d", 0),
-            "top": [
-                {"title": v.get("title"), "views": v.get("views", 0)}
-                for v in (d.get("top_videos") or d.get("top_posts") or [])[:5]
-            ],
-        })
-        s = d.get("series_views_14d") or d.get("series_14d") or []
-        if s: series_by_platform[p].append(s)
+        per_platform = r.get("data") or {}
+        if isinstance(per_platform, dict) and "error" in per_platform and len(per_platform) == 1:
+            # All-platforms failed for this channel; still emit empty rows
+            for p in PLATFORMS:
+                out[p]["channels"].append({
+                    "name": r["channel"],
+                    "platform_handle": r["handles"].get(p, ""),
+                    "subs": 0, "views_today": 0, "views_28d": 0, "top": [],
+                    "error": per_platform.get("error"),
+                })
+            continue
+        for p in PLATFORMS:
+            d = per_platform.get(p) or {}
+            ts = d.get("reach_timeseries") or []
+            out[p]["channels"].append({
+                "name": r["channel"],
+                "platform_handle": r["handles"].get(p, ""),
+                "subs":         d.get("followers", 0) or 0,
+                "views_today":  _last_value(ts),
+                "views_28d":    d.get("impressions", 0) or _sum_values(ts),
+                "likes_28d":    d.get("likes", 0) or 0,
+                "comments_28d": d.get("comments", 0) or 0,
+                "shares_28d":   d.get("shares", 0) or 0,
+                "top": [],  # top-videos endpoint is separate; not pulled here
+            })
+            if ts:
+                series_by_platform[p].append([pt.get("value", 0) or 0 for pt in ts])
 
     for p, lst in series_by_platform.items():
-        if not lst: continue
+        if not lst:
+            continue
         n = max(len(s) for s in lst)
         agg = [0] * n
         for s in lst:
@@ -132,12 +157,4 @@ def _shape_for_panels(results: list) -> dict:
                 agg[i] += v
         out[p]["series_views"] = agg
 
-    # The renderer panels currently render youtube + tiktok prominently;
-    # ig/fb/x are returned too so Penelope can mention them in the brief.
-    return {
-        "youtube":   out["youtube"],
-        "tiktok":    out["tiktok"],
-        "instagram": out["instagram"],
-        "facebook":  out["facebook"],
-        "x":         out["x"],
-    }
+    return {p: out[p] for p in PLATFORMS}
