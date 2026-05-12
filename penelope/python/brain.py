@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 
 import config_loader
+import shift_state
 import transcripts
 from integrations import upload_post, stripe_src, gumroad_src, adsense_src
 from integrations import elevenlabs_src
@@ -45,11 +46,13 @@ async def chat(user_text: str, state: dict) -> str:
     name = cfg.get("name", "Dylan")
     pet = cfg.get("pet_name", "Papi")
 
+    shift = shift_state.current(cfg)
     prompt = textwrap.dedent(f"""
         [Penelope context]
         - User's name: {name} (also called "{pet}")
         - Mode: {mode}    # warm | flirty | professional
         - Time: {time.strftime("%I:%M %p, %A %B %-d")}
+        - Shift state: {json.dumps(shift, ensure_ascii=False)}
         - Recent turns: {json.dumps(history[-10:], ensure_ascii=False)}
 
         [User said]
@@ -58,6 +61,7 @@ async def chat(user_text: str, state: dict) -> str:
         Respond as Penelope. Spoken word only -- no markdown, no lists,
         no code blocks. Keep it brief and natural unless asked for detail.
         Drop occasional Spanish endearments. Match the {mode} mode.
+        Let the shift state inform the greeting/energy but don't recite it.
     """).strip()
 
     return await _call_claude(prompt, sys_prompt)
@@ -65,6 +69,12 @@ async def chat(user_text: str, state: dict) -> str:
 
 async def daily_brief(context: dict) -> str:
     sys_prompt = config_loader.system_prompt()
+    # Inject shift state so the greeting fits where Dylan is in his rotation.
+    try:
+        context = dict(context)
+        context["shift_state"] = shift_state.current(config_loader.load())
+    except Exception:
+        pass
     prompt = textwrap.dedent(f"""
         Deliver Papi's morning brief. He just woke you up by saying "Papi's home".
 

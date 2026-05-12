@@ -1,8 +1,9 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { execSync } = require('node:child_process');
 const PythonBridge = require('./python-bridge');
 
 let mainWindow = null;
@@ -103,9 +104,59 @@ ipcMain.handle('penelope:readAsset', async (_evt, rel) => {
   return fs.readFileSync(p).toString('base64');
 });
 
+// macOS power-event handling — spec said quit on sleep, relaunch on wake.
+// Penelope's hotword listener doesn't run while the Mac is asleep anyway,
+// and a fresh launch on wake guarantees clean audio device state.
+function isOnBattery() {
+  try {
+    const out = execSync("pmset -g batt", { encoding: 'utf8' });
+    return /Battery Power/i.test(out);
+  } catch { return false; }
+}
+
+function applyPowerProfile() {
+  if (!mainWindow) return;
+  const onBatt = isOnBattery();
+  // Low-power on battery: throttle the renderer and drop face redraws when hidden.
+  mainWindow.webContents.setBackgroundThrottling(onBatt);
+  mainWindow.webContents.setFrameRate(onBatt ? 30 : 60);
+  if (py && py.call) {
+    py.call('set_mode', { mode: onBatt ? 'professional' : 'warm' }).catch(()=>{});
+  }
+}
+
+function wirePowerEvents() {
+  powerMonitor.on('suspend', () => {
+    if (py) py.stop();
+    if (mainWindow) hideWindow();
+  });
+  powerMonitor.on('resume', () => {
+    if (!py || !py.isRunning) startPython();
+    applyPowerProfile();
+  });
+  powerMonitor.on('on-ac',      applyPowerProfile);
+  powerMonitor.on('on-battery', applyPowerProfile);
+}
+
+// Auto-launch at login — silent (no dock icon, no window) — spec'd as the default.
+function ensureLoginItem() {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true,
+      name: 'Penelope',
+    });
+  } catch (e) {
+    console.warn('[autolaunch] failed:', e.message);
+  }
+}
+
 app.whenReady().then(() => {
   createWindow();
   startPython();
+  wirePowerEvents();
+  ensureLoginItem();
+  applyPowerProfile();
 });
 
 app.on('window-all-closed', () => {
