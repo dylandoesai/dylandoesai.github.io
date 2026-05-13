@@ -374,6 +374,10 @@ def main():
          + b[:, None] * verts[v1_idx]
          + c[:, None] * verts[v2_idx]).astype(np.float32)
 
+    # Single-photo UV texture from IMG_7427. The multi-view composite
+    # attempt produced ghosting due to PnP misalignment across 25 photos
+    # with varied poses — would need much tighter pose refinement to
+    # use those for texture. The single-photo result is clean.
     p_uv = (a[:, None] * uvs[v0_idx]
           + b[:, None] * uvs[v1_idx]
           + c[:, None] * uvs[v2_idx]).astype(np.float32)
