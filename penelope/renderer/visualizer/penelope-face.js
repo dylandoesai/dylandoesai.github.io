@@ -252,14 +252,18 @@ export class PenelopeFace {
           gl_Position = projectionMatrix * mv;
           gl_PointSize = 1.0 + 0.4 * uBootProgress;
 
-          // Hair (region 7) is a 2D billboard layer behind the head —
-          // skip Lambert lighting on it (flat shading, full brightness).
-          // Face (regions 0-6) gets proper 3D lighting.
+          // Hair — flat shading.
+          // Face — bias approx-normal toward +Z because the face is
+          // roughly a plane facing the camera (not a sphere). Without
+          // this bias, position-based normals make the cheeks (at high
+          // X) have normals pointing sideways, which makes them DARK
+          // under a frontal light — wrong for a flat-ish face.
           float isHair = step(6.5, region);
-          vec3 approx_normal = normalize(pos);
-          vec3 light_dir = normalize(vec3(-0.3, 0.4, 1.0));
-          float face_lambert = max(0.25, dot(approx_normal, light_dir));
-          vLambert = mix(face_lambert, 0.85, isHair);
+          vec3 approx_normal = normalize(pos + vec3(0, 0, 0.6));
+          vec3 light_dir = normalize(vec3(-0.08, 0.15, 1.0));
+          float raw_lambert = dot(approx_normal, light_dir);
+          float face_lambert = mix(0.65, 1.15, smoothstep(0.0, 1.0, raw_lambert));
+          vLambert = mix(face_lambert, 1.0, isHair);
 
           vColor = aColor;
           vGlow = uIntensity * (0.55 + 0.45 * seed) * uBootProgress;
