@@ -75,7 +75,12 @@ export class PenelopeFace {
       uIntensity:    { value: 0.65 },
       uBootProgress: { value: 0 },
       uAccent:       { value: new THREE.Color(0x00E5FF) },
+      uHeadYaw:      { value: 0 },   // -π/6..+π/6 = ±30°
+      uHeadPitch:    { value: 0 },
     };
+    // Head-pose target state — interpolated toward in start()
+    this._targetYaw = 0;
+    this._targetPitch = 0;
 
     this._buildFromCloud().catch((e) => {
       console.warn('[face] cloud load failed', e);
@@ -172,6 +177,8 @@ export class PenelopeFace {
         uniform float uBrowLift;
         uniform float uIntensity;
         uniform float uBootProgress;
+        uniform float uHeadYaw;
+        uniform float uHeadPitch;
         varying vec3  vColor;
         varying float vGlow;
         varying float vSeed;
@@ -182,12 +189,17 @@ export class PenelopeFace {
           float seed = aSeed;
           float region = aRegion;   // 0=skin 1=eye 2=brow 3=lip 4=nose 6=jaw
 
-          // ── HEAD ROTATION (visible 3D feel) ─────────────────────
-          // Range cranked up so the rotation is obviously a 3D head
-          // turning in space (visible volume difference between sides
-          // and front as she rotates).
-          float yaw   = sin(uTime * 0.20) * 0.42;       // ±24°
-          float pitch = sin(uTime * 0.14) * 0.14;       // ±8°
+          // ── HEAD ROTATION (state-driven) ────────────────────────
+          // Forward-facing by default (eye contact). Head turns to one
+          // side ±30° only when she's processing/looking something up.
+          // uHeadYaw is interpolated toward a target yaw on the JS side
+          // based on her state (idle/speaking/thinking).
+          float yaw   = uHeadYaw;
+          float pitch = uHeadPitch;
+          // Tiny micro-motion overlay so the head isn't dead-frozen
+          // even at rest (subtle breath-driven sway).
+          yaw   += sin(uTime * 0.35) * 0.015;
+          pitch += sin(uTime * 0.22) * 0.010;
           float cy = cos(yaw),   sy = sin(yaw);
           float cp = cos(pitch), sp = sin(pitch);
           vec3 p1 = vec3(pos.x, pos.y * cp - pos.z * sp, pos.y * sp + pos.z * cp);
@@ -351,6 +363,28 @@ export class PenelopeFace {
     if (e.browLift != null) this._vBrowLift = e.browLift;
   }
 
+  /** State machine for head pose:
+   *  - "forward" / "speaking" / "idle" → target yaw = 0 (eye contact)
+   *  - "thinking" → head turns ±30°, side chosen randomly each time
+   *    she enters the state. Stays turned until next state change.
+   */
+  setHeadState(s) {
+    if (s === 'thinking') {
+      // Random side, but persist for the duration of this thinking phase
+      if (!this._thinkingActive) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        this._targetYaw   = side * (Math.PI / 6);   // ±30°
+        this._targetPitch = (Math.random() - 0.3) * 0.12;
+        this._thinkingActive = true;
+      }
+    } else {
+      // Forward, eye contact
+      this._targetYaw = 0;
+      this._targetPitch = 0;
+      this._thinkingActive = false;
+    }
+  }
+
   setIdle() {
     this._vJaw = 0; this._vCheek = 0; this._vEye = 0;
     this._vMouthOpen = 0; this._vMouthWide = 0;
@@ -408,6 +442,11 @@ export class PenelopeFace {
       u.uCheek.value     = lerp(u.uCheek.value,     this._vCheek,     0.18);
       u.uEye.value       = lerp(u.uEye.value,       this._vEye,       0.22);
       u.uIntensity.value = lerp(u.uIntensity.value, this._vIntensity, 0.1);
+
+      // Head pose: smoothly converge to target. Slow enough to feel
+      // natural (~0.5s to fully turn), fast enough not to feel sluggish.
+      u.uHeadYaw.value   = lerp(u.uHeadYaw.value,   this._targetYaw,   0.06);
+      u.uHeadPitch.value = lerp(u.uHeadPitch.value, this._targetPitch, 0.06);
 
       if (this._bootStart) {
         const elapsed = performance.now() - this._bootStart;

@@ -355,12 +355,23 @@ function handlePyEvent(evt) {
     case 'hotword': handleWake(evt.data); break;
     case 'go_sleep': handleSleep(); break;
     case 'user_transcript': appendThread('user', evt.data.text); break;
-    case 'assistant_text': appendThread('penelope', evt.data.text); break;
     case 'assistant_audio': playTts(evt.data.url, evt.data.visemes || []); break;
-    case 'assistant_thinking': $('status-text').textContent = 'thinking'; break;
+    case 'assistant_thinking':
+      // She's processing — turn her head ±30° to one side, lose eye
+      // contact while she "looks something up"
+      $('status-text').textContent = 'thinking';
+      state.face?.setHeadState?.('thinking');
+      break;
     case 'assistant_idle':
+      // Listening / waiting — forward-facing, full eye contact
       $('status-text').textContent = 'listening';
       state.face?.setIdle();
+      state.face?.setHeadState?.('forward');
+      break;
+    case 'assistant_text':
+      // She's about to speak — face Dylan again before the audio plays
+      state.face?.setHeadState?.('forward');
+      appendThread('penelope', evt.data.text);
       break;
     case 'mode_changed':
       state.face?.setMode?.(evt.data.mode); break;
