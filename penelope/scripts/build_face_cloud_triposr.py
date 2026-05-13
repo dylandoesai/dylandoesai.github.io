@@ -27,8 +27,13 @@ import trimesh
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-MESH_FP = Path("/tmp/triposr_head_v3/0/mesh.obj")
-TEX_FP  = Path("/tmp/triposr_head_v3/0/texture.png")
+# Switched from IMG_7419 (small, smiling, tilted) to IMG_7427 (3415x3415
+# high-res, clean front, neutral expression — shows her jawline + nose
+# profile properly per Dylan's spec). Plus a different HEAD CROP source
+# image since extract_head.py was run on IMG_7427.
+MESH_FP   = Path("/tmp/triposr_7427/0/mesh.obj")
+TEX_FP    = Path("/tmp/triposr_7427/0/texture.png")
+HEAD_CROP_FP = Path("/tmp/penelope_head_7427.png")
 OUT     = ROOT / "assets" / "face-cloud.bin"
 META    = ROOT / "assets" / "face-cloud-meta.json"
 
@@ -127,7 +132,7 @@ def landmarks_on_head_crop():
         num_faces=1,
     )
     landmarker = mp_vision.FaceLandmarker.create_from_options(opts)
-    img_bgr = cv2.imread('/tmp/penelope_head.png')
+    img_bgr = cv2.imread(str(HEAD_CROP_FP))
     H, W = img_bgr.shape[:2]
     rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -197,7 +202,10 @@ def main():
     print(f"mesh: {len(verts)} verts, {len(tris)} tris, {len(uvs)} UVs",
           file=sys.stderr)
 
-    # Center + rotate so face is at +Z, flip Y for Y-up
+    # Center + rotate so face is at +Z, flip Y for Y-up.
+    # Verified by orbiting raw mesh: face is at +X direction (visible
+    # at camera yaw=90), upside down (chin at top). Rotate by -90°
+    # around Y maps +X → +Z. Then Y-flip below puts head right-side up.
     centroid = verts.mean(axis=0)
     verts = verts - centroid
     theta = -math.pi * 90 / 180
@@ -309,6 +317,24 @@ def main():
     print(f"  region histogram: " + ", ".join(
         f"{r}={c}" for r, c in zip(*np.unique(region_v, return_counts=True))),
         file=sys.stderr)
+
+    # ── FACE CENTERING ──────────────────────────────────────────
+    # TripoSR mesh extends well above the actual face (hair takes the
+    # upper half). Translate the mesh down so the FACE CENTER (between
+    # eyes) sits at world Y=0, which is where the camera looks. This
+    # makes her eyes meet Dylan's eyes by default.
+    if "left_eye" in feature_centers and "right_eye" in feature_centers:
+        face_center_y = (feature_centers["left_eye"][1]
+                       + feature_centers["right_eye"][1]) / 2
+        face_center_x = (feature_centers["left_eye"][0]
+                       + feature_centers["right_eye"][0]) / 2
+        print(f"  centering face: x_shift={-face_center_x:.3f} y_shift={-face_center_y:.3f}",
+              file=sys.stderr)
+        verts[:, 0] -= face_center_x
+        verts[:, 1] -= face_center_y
+        # Update feature centers too
+        for k in feature_centers:
+            feature_centers[k] = feature_centers[k] - np.array([face_center_x, face_center_y, 0.0])
 
     # Per-triangle region = majority of its 3 vertices
     regions = np.zeros(len(tris), dtype=np.uint8)
