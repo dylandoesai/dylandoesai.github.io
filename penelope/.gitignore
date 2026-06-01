@@ -1,0 +1,46 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+assets/songs/*.mp3
+assets/songs/*.m4a
+assets/*.ppn
+.env
+
+# Reference photos are personal-use only — README forbids redistribution.
+# Drop them locally in assets/reference/; only the extracted face-mesh.json
+# is safe to commit.
+assets/reference/
+
+# Owner-identity photos used by face_recognition. Personal data.
+assets/owner_faces/
+
+# Auto-downloaded MediaPipe model (~3.6MB); extract_face_mesh.py re-fetches.
+python/models/
+
+# Vendored by scripts/setup.sh from node_modules/three.
+renderer/vendor/
+
+# Local secrets + personal financial data — never push to the public
+# dylandoesai.github.io remote.
+config/config.json
+config/revenue.json
+
+# OpenWakeWord training mp3s, regenerable via scripts/train_wake_words.py
+build/wake_train/
+
+# Voice audition mp3s
+assets/_voice_audition/
+
+# 213 MB face-cloud binary, regenerable via scripts/build_face_cloud.py
+assets/face-cloud.bin
+
+# Per-photo 3DDFA params (regenerable via scripts/run_3ddfa.py)
+assets/penelope_3d_per_photo/
+
+# Voice ID embeddings (personal)
+.penelope_owner_embeddings.npy
+assets/owner_voice.npy

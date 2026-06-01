@@ -1,0 +1,521 @@
+/* Penelope — Transcendence aesthetic: pure black, electric cyan #00E5FF,
+   chrome-less floating data constellations. No boxes, no borders. Every
+   number is glowing kinetic text with subtle particle ambient. */
+
+:root {
+  --bg: #000000;
+  --accent: #00E5FF;
+  --accent-dim: rgba(0, 229, 255, 0.5);
+  --accent-faint: rgba(0, 229, 255, 0.18);
+  --accent-glow: rgba(0, 229, 255, 0.75);
+  --text: #f5fbff;
+  --text-dim: rgba(245, 251, 255, 0.55);
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  -webkit-font-smoothing: antialiased;
+  cursor: none;
+  user-select: none;
+}
+body.show-cursor { cursor: default; }
+
+/* Faint vertical/horizontal grid — gives the "interface in space" feel */
+#grid-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background-image:
+    linear-gradient(var(--accent-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--accent-faint) 1px, transparent 1px);
+  background-size: 96px 96px;
+  opacity: 0.07;
+  mix-blend-mode: screen;
+}
+
+#stage { position: relative; width: 100%; height: 100%; }
+
+/* The Three.js particle face fills the whole stage; modules float on top */
+#face-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 2;
+}
+
+/* Topbar — minimal, just brand + clock + reset */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 56px; padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  z-index: 50;
+  pointer-events: auto;
+}
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent), 0 0 28px var(--accent-glow);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.brand .name {
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  font-size: 12px;
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+.brand .sub {
+  letter-spacing: 0.3em;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.clock {
+  font-size: 16px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+  letter-spacing: 0.18em;
+}
+#reset-layout {
+  background: transparent; border: 0;
+  color: var(--accent); opacity: 0.25;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  cursor: pointer; padding: 4px 10px;
+  position: absolute; top: 18px; right: 28px;
+}
+#reset-layout:hover { opacity: 1; text-shadow: 0 0 8px var(--accent-glow); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* ── Floating modules — chrome-less, kinetic, draggable ──
+   No background, no border, no backdrop. Just glowing text + a faint
+   particle ambient via ::before pseudos. Each module is absolutely
+   positioned and drag/resize-able. */
+.module {
+  position: absolute;
+  padding: 8px 14px;
+  z-index: 20;
+  pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 180px;
+  /* faint kinetic shimmer */
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.module:hover {
+  z-index: 30;
+}
+.module::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 12px;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(0, 229, 255, 0.06) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0.5;
+  animation: aura 6s ease-in-out infinite alternate;
+}
+@keyframes aura {
+  0%   { opacity: 0.3; transform: scale(0.92); }
+  100% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.m-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent-glow);
+  cursor: move;
+  user-select: none;
+}
+.m-big {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--text);
+  text-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 18px rgba(0, 229, 255, 0.4),
+    0 0 36px rgba(0, 229, 255, 0.15);
+  letter-spacing: 0.04em;
+}
+.m-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+/* Readable big number — same cyan glow as the rest of the UI.
+   No particle stippling (made it unreadable). Instead: bright cyan
+   text with multi-stop glow + a subtle scan-line overlay so it
+   visually matches the hologram material. */
+.m-big-num {
+  position: relative;
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 200;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 18px var(--accent-glow),
+    0 0 44px rgba(0, 229, 255, 0.45),
+    0 0 88px rgba(0, 229, 255, 0.18);
+  line-height: 1.05;
+  cursor: pointer;
+  /* hologram scanline overlay clipped to the text */
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 229, 255, 0.0) 0px,
+      rgba(0, 229, 255, 0.0) 2px,
+      rgba(0, 0, 0, 0.3)     2px,
+      rgba(0, 0, 0, 0.3)     3px
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: bigNumFlicker 5s ease-in-out infinite;
+}
+@keyframes bigNumFlicker {
+  0%, 100% { opacity: 1; }
+  47%      { opacity: 0.92; }
+  48%      { opacity: 1.0; }
+  72%      { opacity: 0.95; }
+}
+.m-foot {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.18em; color: var(--accent);
+  opacity: 0.65;
+  margin-top: 2px;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Particle-stippled hologram bars — vertical streaks of cyan dots,
+   not solid rectangles. Built from layered radial-gradients to keep
+   it CSS-only but match the kinetic face material. */
+.m-bars {
+  display: flex; align-items: flex-end; gap: 6px;
+  height: 44px; margin-top: 8px;
+  cursor: pointer;
+}
+.m-bars .bar {
+  flex: 1 1 0;
+  min-width: 8px;
+  background:
+    /* tiny dot grid */
+    radial-gradient(rgba(0, 229, 255, 0.95) 1px, transparent 1.5px) 0 0 / 4px 4px,
+    radial-gradient(rgba(0, 229, 255, 0.45) 0.6px, transparent 1px) 2px 2px / 4px 4px,
+    /* glow gradient bottom→top */
+    linear-gradient(
+      to top,
+      rgba(0, 229, 255, 0.55) 0%,
+      rgba(0, 229, 255, 0.18) 70%,
+      transparent 100%
+    );
+  box-shadow:
+    0 0 8px rgba(0, 229, 255, 0.55),
+    inset 0 -8px 18px rgba(0, 229, 255, 0.45);
+  border-top: 1px solid var(--accent);
+  border-radius: 1px;
+}
+
+/* Readable text list — actual reminder / event lines */
+.m-text-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 4px;
+  font-family: var(--mono); font-size: 12px;
+  max-height: 220px; overflow-y: auto;
+}
+.m-text-list li {
+  display: flex; gap: 8px; align-items: baseline;
+  color: var(--text);
+  text-shadow: 0 0 4px var(--accent-glow);
+  cursor: pointer;
+}
+.m-text-list li:hover { color: var(--accent); }
+.m-text-list li .t {
+  color: var(--accent); font-size: 10px; min-width: 52px;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.m-text-list .empty {
+  color: var(--text-dim); font-size: 11px; opacity: 0.5;
+}
+
+.m-list {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 4px;
+}
+.m-list .row {
+  font-family: var(--mono); font-size: 11px;
+  display: flex; justify-content: space-between; gap: 14px;
+  color: var(--text-dim);
+}
+.m-list .row b {
+  color: var(--text);
+  font-weight: 400;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.m-list .row a {
+  color: inherit; text-decoration: none;
+}
+.m-list .row:hover { color: var(--accent); }
+.m-list .row:hover b { color: var(--accent); }
+
+.m-thin {
+  list-style: none;
+  font-family: var(--mono); font-size: 11px;
+  display: flex; flex-direction: column; gap: 3px;
+  color: var(--text-dim);
+}
+.m-thin li {
+  display: flex; gap: 10px; align-items: baseline;
+  cursor: pointer;
+}
+.m-thin li:hover { color: var(--accent); }
+.m-thin li .time {
+  color: var(--accent); font-size: 10px; min-width: 56px;
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Channel constellations — 5 platform rows each */
+.channel-mod {
+  position: absolute;
+  padding: 8px 14px;
+  z-index: 18;
+  pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 220px;
+}
+.channel-mod::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(0, 229, 255, 0.05) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  animation: aura 7s ease-in-out infinite alternate;
+}
+.channel-mod .ch-name {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--accent-glow);
+  cursor: move;
+  user-select: none;
+  border-bottom: 1px solid var(--accent-faint);
+  padding-bottom: 2px;
+}
+.channel-mod .plat {
+  display: flex; justify-content: space-between; gap: 14px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.channel-mod .plat:hover { color: var(--accent); }
+.channel-mod .plat .nm {
+  letter-spacing: 0.2em; min-width: 28px;
+}
+.channel-mod .plat .vals {
+  color: var(--text);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.ch-bars {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 22px; margin-top: 4px;
+  cursor: pointer;
+  min-width: 200px;
+}
+.ch-foot {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.18em; color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Resize affordance — tiny dots only visible on hover */
+.resize-handle {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 12px; height: 12px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.module:hover .resize-handle,
+.channel-mod:hover .resize-handle {
+  opacity: 0.6;
+}
+.resize-handle::before {
+  content: "";
+  position: absolute; right: 2px; bottom: 2px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Compose dock — invisible text channel ALL THE WAY at the bottom.
+   The brief gets spoken; we don't need to also dump a wall of text
+   in the middle of the interface. Keep the thread very short so the
+   compose dock stays a thin strip at the bottom even with messages. */
+#compose-dock {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  bottom: 18px;
+  width: min(720px, 70vw);
+  z-index: 25;
+  pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+}
+#compose-thread {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 56px; overflow-y: auto;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+/* Only show the last 2 turns so the thread never grows */
+#compose-thread .msg:nth-last-child(n+3) { display: none; }
+#compose-thread .msg {
+  padding: 6px 10px;
+  border-left: 1px solid var(--accent-faint);
+  opacity: 0.85;
+  word-break: break-word;
+}
+#compose-thread .msg.user { color: var(--text); }
+#compose-thread .msg a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--accent-faint);
+}
+#compose-row {
+  position: relative;
+  display: flex; align-items: center;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.08);
+  padding: 8px 0;
+  transition: border-color 0.2s ease;
+}
+#compose-row.focused, #compose-row.dragging {
+  border-bottom-color: var(--accent-dim);
+}
+#compose-input {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #ffffff;
+  outline: none;
+  min-height: 18px;
+  caret-color: var(--accent);
+  opacity: 0.85;
+}
+#compose-input:focus { opacity: 1; }
+#compose-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-dim);
+  opacity: 0.25;
+}
+#compose-attachments {
+  display: flex; gap: 6px; padding-left: 8px;
+}
+#compose-attachments .att {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 12px;
+  border: 1px solid var(--accent-faint);
+  font-size: 11px; color: var(--accent);
+  background: rgba(0, 229, 255, 0.05);
+}
+
+/* Boot overlay — cinematic fade-in text */
+#boot-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.92) 75%
+  );
+  pointer-events: none;
+  transition: opacity 600ms ease;
+}
+#boot-overlay.hidden { opacity: 0; }
+.boot-text {
+  font-family: var(--mono); font-size: 28px; font-weight: 300;
+  color: var(--accent); letter-spacing: 0.45em; text-transform: uppercase;
+  text-shadow:
+    0 0 14px var(--accent-glow),
+    0 0 36px rgba(0, 229, 255, 0.55),
+    0 0 72px rgba(0, 229, 255, 0.25);
+  animation: bootGlow 1.6s ease-in-out infinite alternate;
+}
+@keyframes bootGlow {
+  0%   { opacity: 0.7; letter-spacing: 0.45em; }
+  100% { opacity: 1;   letter-spacing: 0.55em; }
+}
+
+/* Pre-wake: everything but the face is invisible, plus a horizontal
+   sweep line scanning down the screen so it FEELS like she's booting.
+   Released when wake fires (body.pre-wake is removed in handleWake). */
+body.pre-wake .module,
+body.pre-wake .channel-mod,
+body.pre-wake #compose-dock,
+body.pre-wake #topbar,
+body.pre-wake #grid-overlay { opacity: 0; }
+body.pre-wake::after {
+  content: "";
+  position: fixed; left: 0; right: 0; top: 0;
+  height: 2px; pointer-events: none; z-index: 60;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--accent-glow) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 0 24px var(--accent-glow);
+  animation: scanLine 3.6s linear infinite;
+}
+@keyframes scanLine {
+  0%   { transform: translateY(0); opacity: 0.0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.9; }
+  100% { transform: translateY(100vh); opacity: 0.0; }
+}
+
+/* Scrollbar */
+*::-webkit-scrollbar { width: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--accent-dim); border-radius: 2px;
+}
+
+/* Particle-canvas graphs inside modules — same cyan material as the face */
+.m-canvas {
+  display: block;
+  width: 240px;
+  height: 56px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.m-canvas.chart { height: 64px; margin-top: 2px; }
+.m-canvas.tall  { height: 80px; }
+
+.channel-mod .ch-chart {
+  display: block;
+  width: 220px; height: 32px;
+  cursor: pointer;
+}

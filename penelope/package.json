@@ -1,0 +1,60 @@
+{
+  "name": "penelope",
+  "version": "0.1.0",
+  "description": "Penelope — cyber personal AI assistant with a 3D particle face",
+  "main": "electron/main.js",
+  "author": "Papi",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder --mac --arm64 --x64"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.papi.penelope",
+    "productName": "Penelope",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg"],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Penelope listens for your wake words and conversations.",
+        "NSCameraUsageDescription": "Penelope uses your camera for face recognition so she only responds to you.",
+        "NSSpeechRecognitionUsageDescription": "Penelope transcribes your voice locally via Whisper.",
+        "NSCalendarsUsageDescription": "Penelope reads your Apple Calendar to brief you on the day and writes your O-I Kalama shifts.",
+        "NSRemindersUsageDescription": "Penelope reads and creates Apple Reminders for you.",
+        "NSAppleEventsUsageDescription": "Penelope controls Spotify, Apple Mail, and other Mac apps via AppleScript.",
+        "NSContactsUsageDescription": "Penelope reads contacts for iMessage and phone-call routing.",
+        "LSUIElement": false
+      }
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "config/**/*",
+      "python/**/*",
+      "CLAUDE.md",
+      "!python/__pycache__",
+      "!.venv"
+    ],
+    "asarUnpack": [
+      "python/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "CLAUDE.md"
+    ],
+    "extraResources": [
+      { "from": ".venv", "to": "python_venv" }
+    ]
+  }
+}

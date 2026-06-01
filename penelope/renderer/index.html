@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' file: data: blob:; img-src 'self' data: blob:; connect-src 'self' file: data: blob:;" />
+  <title>Penelope</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="grid-overlay" aria-hidden="true"></div>
+
+  <main id="stage">
+    <canvas id="face-canvas"></canvas>
+
+    <header id="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span class="name">PENELOPE</span>
+        <span class="sub" id="status-text">standby</span>
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+      <button id="reset-layout" title="Reset layout">Reset</button>
+    </header>
+
+    <!-- Free-floating chrome-less data constellations. Every "module" is
+         just glowing kinetic text. No borders, no backdrops, no boxes.
+         Each is grabbable and movable to anywhere on screen.            -->
+
+    <!-- Every module is title + particle-rendered graph. All drawn in
+         the same cyan-additive material as her face. Same drag/resize. -->
+    <div class="module" id="m-revenue" data-mod="revenue">
+      <div class="m-label">REVENUE · MTD</div>
+      <div class="m-big-num" id="rev-big">$0.00</div>
+      <div class="m-bars" id="rev-chart"></div>
+      <div class="m-foot" id="rev-foot"></div>
+    </div>
+
+    <div class="module" id="m-weather" data-mod="weather">
+      <div class="m-label" id="wx-label">WEATHER</div>
+      <div class="m-big-num" id="wx-temp">--°</div>
+    </div>
+
+    <div class="module" id="m-schedule" data-mod="schedule">
+      <div class="m-label">TODAY</div>
+      <ul class="m-text-list" id="sched-list"></ul>
+    </div>
+
+    <div class="module" id="m-todos" data-mod="todos">
+      <div class="m-label">REMINDERS</div>
+      <ul class="m-text-list" id="todo-list"></ul>
+    </div>
+
+    <!-- One floating constellation per brand. Each lists ALL 5 platforms
+         with subs + 28d views. 7 channels = 7 modules.                  -->
+    <div id="channels-host"></div>
+
+    <div id="boot-overlay" class="hidden">
+      <div class="boot-text" id="boot-text">INITIALIZING…</div>
+    </div>
+
+    <!-- Invisible compose surface — the text channel under the persona -->
+    <div id="compose-dock" aria-label="Compose">
+      <div id="compose-thread"></div>
+      <div id="compose-row">
+        <div id="compose-input" contenteditable="plaintext-only"
+             data-placeholder="…"></div>
+        <div id="compose-attachments"></div>
+      </div>
+    </div>
+  </main>
+
+  <audio id="tts-audio" preload="auto"></audio>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

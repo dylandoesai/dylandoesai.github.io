@@ -1,0 +1,7 @@
+{
+  "enrolled_at": 1778558765,
+  "n_samples": 1,
+  "threshold": 0.55,
+  "encoder": "resemblyzer (GE2E, 256-d)",
+  "notes": "Lowered from 0.72 to 0.55 — Dylan's enrolled embedding came from a 75-min reference recording session, the live MBAir built-in mic shows ~0.55-0.66 similarity even for honest matches. Cross-recording-condition drift."
+}

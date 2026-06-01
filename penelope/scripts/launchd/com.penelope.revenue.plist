@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Daily revenue scrape. Install with:
+
+    cp scripts/launchd/com.penelope.revenue.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.penelope.revenue.plist
+
+  Uninstall with:
+    launchctl bootout gui/$(id -u)/com.penelope.revenue
+    rm ~/Library/LaunchAgents/com.penelope.revenue.plist
+
+  Runs at 09:05 local time every day. Logs to /tmp.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.penelope.revenue</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/dylanireland/dylandoesai.github.io/penelope/scripts/scrape-revenue.sh</string>
+    <string>--headless</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/dylanireland/dylandoesai.github.io/penelope</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>5</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/penelope.revenue.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/penelope.revenue.err</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

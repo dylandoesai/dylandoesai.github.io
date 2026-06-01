@@ -1,0 +1,50 @@
+{
+  "name": "Dylan",
+  "pet_name": "Papi",
+
+  "tts_voice": "helena",
+  "tts_rate": "-8%",
+  "tts_pitch": "-2Hz",
+  "tts_audition_on_first_launch": true,
+
+  "stt_model": "base.en",
+
+  "picovoice_access_key": "",
+
+  "weather_location": null,
+
+  "revenue_milestones": [500, 1000, 2500, 5000, 10000, 25000],
+
+  "knowledge_paths": [
+    "~/Documents/notes",
+    "~/Documents/journal",
+    "~/Documents/projects"
+  ],
+
+  "wake_song": {
+    "service": "spotify",
+    "spotify_uri": "",
+    "comment": "Right-click the song in Spotify -> Share -> Copy Spotify URI (e.g. spotify:track:5Sl3GKjpKTuFICJsTuS3p2). Pasting the share URL (https://open.spotify.com/track/...) also works."
+  },
+
+  "upload_post": {
+    "api_key": "",
+    "_comment": "Channel/platform/nickname mapping lives in config/channels.json"
+  },
+
+  "stripe": { "api_key": "" },
+  "gumroad": { "access_token": "" },
+  "adsense": { "oauth_token": "", "account_id": "" },
+
+  "home_assistant": { "base_url": "", "token": "" },
+  "slack": { "user_token": "" },
+
+  "modes": {
+    "default": "warm",
+    "rules": {
+      "professional_when_calendar_keywords": ["meeting", "call", "interview", "podcast"],
+      "flirty_after_hour": 22,
+      "professional_if_other_face_present": true
+    }
+  }
+}

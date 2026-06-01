@@ -1,0 +1,66 @@
+{
+  "_comment": [
+    "Dylan's rotating 12-hour shift schedule at the glass container plant.",
+    "",
+    "Two ways to populate this:",
+    "  1. PATTERN MODE  -- if your rotation follows a fixed repeating pattern",
+    "     (e.g. 'Panama' or 'DuPont' or '2-2-3'), set 'mode' = 'pattern' and",
+    "     fill in 'pattern' as the sequence of shift letters for one cycle:",
+    "        D = day shift (e.g. 6am-6pm)",
+    "        N = night shift (e.g. 6pm-6am)",
+    "        O = off",
+    "     Plus 'anchor_date' = a date you KNOW the first letter of the",
+    "     pattern applies to. Penelope rolls forward from there.",
+    "",
+    "  2. CALENDAR MODE -- if your rotation is irregular, list explicit",
+    "     dates. Set 'mode' = 'calendar' and fill in 'days' as an array of",
+    "     {date, shift} entries. Shift letters as above.",
+    "",
+    "Dylan can send Penelope a photo of his printed schedule and she'll",
+    "fill this file in for him (vision read on the photo).",
+    "",
+    "Times default to 6am-6pm for day, 6pm-6am for night. Override per-day",
+    "by adding 'start' and 'end' fields (HH:MM, 24h)."
+  ],
+
+  "mode": "pattern",
+  "crew": "D",
+  "plant": "O-I Kalama",
+  "shift_times": {
+    "day":   { "start": "06:45", "end": "18:45" },
+    "night": { "start": "18:45", "end": "06:45" }
+  },
+
+  "_routine_comment": "Dylan wakes at 05:00 for day shifts / 17:00 for nights, leaves the house 05:15-05:30 AM/PM depending on direction. Penelope uses these for pre-shift greetings + wake-up nudges.",
+  "routine": {
+    "wake_for_day":    "05:00",
+    "leave_for_day":   "05:25",
+    "wake_for_night":  "17:00",
+    "leave_for_night": "17:25"
+  },
+
+  "_pattern_comment": [
+    "Crew D's 28-day O-I Kalama rotation, viewed as 4 weeks:",
+    "  Week 1:  3D  2off  2D    (Fri-Thu starting from anchor)",
+    "  Week 2:  3off  2N  2off",
+    "  Week 3:  3N  2off  2N",
+    "  Week 4:  3off  2D  2off",
+    "Anchored to 2026-01-02 (the first day of cycle 1 in the printed",
+    "schedule). shift_state rolls forward via",
+    "  cycle_day = (date - anchor) mod 28",
+    "and reads the letter at that index of 'sequence'.",
+    "14 work days per 28-day cycle (7 day shifts, 7 night shifts)."
+  ],
+  "pattern": {
+    "anchor_date": "2026-01-02",
+    "sequence": [
+      "D", "D", "D", "O", "O", "D", "D",
+      "O", "O", "O", "N", "N", "O", "O",
+      "N", "N", "N", "O", "O", "N", "N",
+      "O", "O", "O", "D", "D", "O", "O"
+    ]
+  },
+
+  "_days_comment": "Calendar mode override list. Empty when using pattern mode. If a date appears here it wins over the pattern (good for one-off swaps).",
+  "days": []
+}

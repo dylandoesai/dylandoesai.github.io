@@ -1,0 +1,91 @@
+{
+  "_comment": [
+    "7 channels, each with up to 5 platforms (YouTube, TikTok, Instagram,",
+    "Facebook, X).",
+    "",
+    "name = the CANONICAL BRAND NAME -- same as your YouTube channel name.",
+    "       This is what Penelope uses when she refers to the channel out",
+    "       loud ('the Vellum Archives channel did 80k views today').",
+    "",
+    "platforms.<plat>.handle = your public @ on that platform. Handles vary",
+    "       per platform because you had to take what was available.",
+    "",
+    "platforms.<plat>.upload_post_nickname = the user value you set for that",
+    "       specific platform account in your upload-post.com dashboard.",
+    "",
+    "Source of truth pulled from network/channels.json + upload_post_profiles.json",
+    "in the AI Empire Network repo (2026-05-08 snapshot)."
+  ],
+  "channels": [
+    {
+      "id": 1, "name": "SpaceStackz",
+      "platforms": {
+        "youtube":   { "handle": "@SpaceStackz",  "upload_post_nickname": "Factstackz" },
+        "tiktok":    { "handle": "@factstackz",   "upload_post_nickname": "Factstackz" },
+        "instagram": { "handle": "@factstackzz",  "upload_post_nickname": "Factstackz" },
+        "facebook":  { "handle": "SpaceStackz",   "upload_post_nickname": "Factstackz" },
+        "x":         { "handle": "@FactStackzz",  "upload_post_nickname": "Factstackz" }
+      }
+    },
+    {
+      "id": 2, "name": "Vellum Archives",
+      "platforms": {
+        "youtube":   { "handle": "@VellumArchives",   "upload_post_nickname": "Vellumarchive" },
+        "tiktok":    { "handle": "@vellumarchives",   "upload_post_nickname": "Vellumarchive" },
+        "instagram": { "handle": "@thevellumarchives","upload_post_nickname": "Vellumarchive" },
+        "facebook":  { "handle": "Vellum Archives",   "upload_post_nickname": "Vellumarchive" },
+        "x":         { "handle": "@vellumarchives",   "upload_post_nickname": "Vellumarchive" }
+      }
+    },
+    {
+      "id": 3, "name": "A Cold File Story",
+      "platforms": {
+        "youtube":   { "handle": "@AColdFileStory", "upload_post_nickname": "Acoldfilestory" },
+        "tiktok":    { "handle": "@acoldfilestory", "upload_post_nickname": "Acoldfilestory" },
+        "instagram": { "handle": "@acoldfilestory", "upload_post_nickname": "Acoldfilestory" },
+        "facebook":  { "handle": "A Cold File Story","upload_post_nickname": "Acoldfilestory" },
+        "x":         { "handle": "@AColdFileStory", "upload_post_nickname": "Acoldfilestory" }
+      }
+    },
+    {
+      "id": 4, "name": "Witness Archives",
+      "platforms": {
+        "youtube":   { "handle": "@WitnessArchives",    "upload_post_nickname": "Witnessarchives" },
+        "tiktok":    { "handle": "@witnessarchives",    "upload_post_nickname": "Witnessarchives" },
+        "instagram": { "handle": "@thewitnessarchives", "upload_post_nickname": "Witnessarchives" },
+        "facebook":  { "handle": "Witness Archives",    "upload_post_nickname": "Witnessarchives" },
+        "x":         { "handle": "@witnessarchivez",    "upload_post_nickname": "Witnessarchives" }
+      }
+    },
+    {
+      "id": 5, "name": "Opulent Crest",
+      "platforms": {
+        "youtube":   { "handle": "@OpulentCrest",    "upload_post_nickname": "Opulentcrest" },
+        "tiktok":    { "handle": "@opulentcrest",    "upload_post_nickname": "Opulentcrest" },
+        "instagram": { "handle": "@theopulentcrest", "upload_post_nickname": "Opulentcrest" },
+        "facebook":  { "handle": "Opulent Crest",    "upload_post_nickname": "Opulentcrest" },
+        "x":         { "handle": "@TheOpulentCrest", "upload_post_nickname": "Opulentcrest" }
+      }
+    },
+    {
+      "id": 6, "name": "Sleep Echoez",
+      "platforms": {
+        "youtube":   { "handle": "@SleepEchoez", "upload_post_nickname": "Sleepechoez" },
+        "tiktok":    { "handle": "@sleepechoez", "upload_post_nickname": "Sleepechoez" },
+        "instagram": { "handle": "@sleepechoez", "upload_post_nickname": "Sleepechoez" },
+        "facebook":  { "handle": "Sleep Echoez", "upload_post_nickname": "Sleepechoez" },
+        "x":         { "handle": "@sleepechoez", "upload_post_nickname": "Sleepechoez" }
+      }
+    },
+    {
+      "id": 7, "name": "Night Cabin Tales",
+      "platforms": {
+        "youtube":   { "handle": "@NightCabinTales", "upload_post_nickname": "Nightcabintales" },
+        "tiktok":    { "handle": "@night.cabin.tales","upload_post_nickname": "Nightcabintales" },
+        "instagram": { "handle": "@nightcabintales", "upload_post_nickname": "Nightcabintales" },
+        "facebook":  { "handle": "Night Cabin Tales","upload_post_nickname": "Nightcabintales" },
+        "x":         { "handle": "@nightcabintales", "upload_post_nickname": "Nightcabintales" }
+      }
+    }
+  ]
+}

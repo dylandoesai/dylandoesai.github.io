@@ -1,0 +1,12 @@
+{
+  "currency": "USD",
+  "total_today": 0,
+  "total_mtd": 0,
+  "total_ytd": 0,
+  "series_daily": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "sources": [
+    { "name": "Stripe", "today": 0, "mtd": 0 },
+    { "name": "Gumroad", "today": 0, "mtd": 0 },
+    { "name": "AdSense", "today": 0, "mtd": 0 }
+  ]
+}
