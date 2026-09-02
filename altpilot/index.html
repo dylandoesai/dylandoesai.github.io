@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AltPilot — unlimited AI alt text for your store</title>
+<style>body{font:17px/1.55 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#111;background:#fff}h1{font-size:2.1em;margin:.2em 0}.tag{color:#555}pre{background:#f4f4f4;padding:14px;overflow:auto;border-radius:6px;font-size:14px}.tier{border:1px solid #ddd;border-radius:8px;padding:14px 18px;margin:12px 0}.price{font-size:1.4em;font-weight:600}a.btn{display:inline-block;background:#111;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;margin-top:8px}small{color:#666}</style></head><body>
+<h1>AltPilot</h1><p class="tag"><b>Unlimited AI alt text and image SEO for Shopify stores. One flat price. No per-image meter.</b></p>
+<p>Every other bulk alt-text app charges you per image because it pays a cloud AI for each one. AltPilot runs its vision model on our own hardware, so we don't meter you: write alt text for 50 images or 50,000 for the same monthly price. Accessibility-correct, search-friendly, describes what's actually in the picture.</p>
+<h2>Try the engine right now</h2><p>Send any public product image URL. You get alt text, search tags and a short description back. This is the live demo box, not a mock.</p>
+<pre>curl -X POST https://tin-wallpapers-combines-function.trycloudflare.com/alt \
+  -H "Content-Type: application/json" \
+  -d '{"image_url":"https://your-store.com/products/mug.jpg","product_title":"Ceramic Mug"}'</pre>
+<pre>{"alt":"Four Egyptian figures harvesting wheat under a golden sun, one holding a scroll…",
+ "tags":["ancient","egyptian","harvest","wheat","art"], "long_desc":"…", "cost_usd":0.0}</pre>
+<h2>Pricing</h2>
+<div class="tier"><div class="price">$19 / month — Starter</div>Unlimited images, one store, bulk "fill every missing alt" run, preview before apply.</div>
+<div class="tier"><div class="price">$49 / month — Pro</div>Everything in Starter + image search tags, product descriptions, and unlimited catalog translation (coming next).</div>
+<h2>Early access</h2><p>The Shopify listing is in review. Want it on your store first? Leave your store name here and you get the first month free:</p>
+<a class="btn" href="https://github.com/dylandoesai/dylandoesai.github.io/issues/new?title=AltPilot%20early%20access&body=Store%20URL%3A%20">Request early access</a>
+<p><small>Built and run by a solo studio in Longview, WA on its own hardware. Product/image data only; no customer data touched.</small></p>
+</body></html>
