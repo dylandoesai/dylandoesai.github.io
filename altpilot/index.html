@@ -8,6 +8,11 @@
   -d '{"image_url":"https://your-store.com/products/mug.jpg","product_title":"Ceramic Mug"}'</pre>
 <pre>{"alt":"Four Egyptian figures harvesting wheat under a golden sun, one holding a scroll…",
  "tags":["ancient","egyptian","harvest","wheat","art"], "long_desc":"…", "cost_usd":0.0}</pre>
+<h2>Also live on the same box</h2>
+<pre>curl -X POST https://tin-wallpapers-combines-function.trycloudflare.com/translate -H "Content-Type: application/json" \
+  -d '{"texts":["Hand-thrown ceramic mug, 12 oz, dishwasher safe."],"target_lang":"Spanish"}'
+→ {"translations":["Taza de cerámica hecha a mano, 12 oz, lavavajillas seguro."],"words_in":8,"cost_usd":0.0}</pre>
+<p>Unlimited-words catalog translation, same flat price. Bulk jobs go through a durable queue (<code>POST /jobs</code>, <code>GET /jobs/{id}</code>) so a busy GPU delays work instead of failing it.</p>
 <h2>Pricing</h2>
 <div class="tier"><div class="price">$19 / month — Starter</div>Unlimited images, one store, bulk "fill every missing alt" run, preview before apply.</div>
 <div class="tier"><div class="price">$49 / month — Pro</div>Everything in Starter + image search tags, product descriptions, and unlimited catalog translation (coming next).</div>
