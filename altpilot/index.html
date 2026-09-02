@@ -7,19 +7,19 @@
 <input id=u style="width:70%;padding:8px" placeholder="https://…/product.jpg"> <input id=ttl style="width:24%;padding:8px" placeholder="Product title (optional)">
 <p><button onclick="go()" id=b>Generate alt text</button></p><pre id=out>—</pre>
 <script>
-const API="https://tin-wallpapers-combines-function.trycloudflare.com";
+const API="https://carmen-life-sys-priced.trycloudflare.com";
 async function go(){const o=document.getElementById('out');const b=document.getElementById('b');b.disabled=true;o.textContent='Working… (the model is looking at your image)';
 try{const r=await fetch(API+'/alt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_url:document.getElementById('u').value,product_title:document.getElementById('ttl').value})});
 const j=await r.json();o.textContent=r.ok?('ALT: '+j.alt+'\nTAGS: '+(j.tags||[]).join(', ')+'\nDESC: '+j.long_desc+'\ncost: $'+j.cost_usd):('Error: '+(j.detail||r.status));}catch(e){o.textContent='Could not reach the demo box: '+e}b.disabled=false}
 </script>
 <h2>Or from the command line</h2><p>Send any public product image URL. You get alt text, search tags and a short description back. This is the live demo box, not a mock.</p>
-<pre>curl -X POST https://tin-wallpapers-combines-function.trycloudflare.com/alt \
+<pre>curl -X POST https://carmen-life-sys-priced.trycloudflare.com/alt \
   -H "Content-Type: application/json" \
   -d '{"image_url":"https://your-store.com/products/mug.jpg","product_title":"Ceramic Mug"}'</pre>
 <pre>{"alt":"Four Egyptian figures harvesting wheat under a golden sun, one holding a scroll…",
  "tags":["ancient","egyptian","harvest","wheat","art"], "long_desc":"…", "cost_usd":0.0}</pre>
 <h2>Also live on the same box</h2>
-<pre>curl -X POST https://tin-wallpapers-combines-function.trycloudflare.com/translate -H "Content-Type: application/json" \
+<pre>curl -X POST https://carmen-life-sys-priced.trycloudflare.com/translate -H "Content-Type: application/json" \
   -d '{"texts":["Hand-thrown ceramic mug, 12 oz, dishwasher safe."],"target_lang":"Spanish"}'
 → {"translations":["Taza de cerámica hecha a mano, 12 oz, lavavajillas seguro."],"words_in":8,"cost_usd":0.0}</pre>
 <p>Unlimited-words catalog translation, same flat price. Bulk jobs go through a durable queue (<code>POST /jobs</code>, <code>GET /jobs/{id}</code>) so a busy GPU delays work instead of failing it.</p>
