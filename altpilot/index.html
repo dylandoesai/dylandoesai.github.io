@@ -2,7 +2,17 @@
 <style>body{font:17px/1.55 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#111;background:#fff}h1{font-size:2.1em;margin:.2em 0}.tag{color:#555}pre{background:#f4f4f4;padding:14px;overflow:auto;border-radius:6px;font-size:14px}.tier{border:1px solid #ddd;border-radius:8px;padding:14px 18px;margin:12px 0}.price{font-size:1.4em;font-weight:600}a.btn{display:inline-block;background:#111;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;margin-top:8px}small{color:#666}</style></head><body>
 <h1>AltPilot</h1><p class="tag"><b>Unlimited AI alt text and image SEO for Shopify stores. One flat price. No per-image meter.</b></p>
 <p>Every other bulk alt-text app charges you per image because it pays a cloud AI for each one. AltPilot runs its vision model on our own hardware, so we don't meter you: write alt text for 50 images or 50,000 for the same monthly price. Accessibility-correct, search-friendly, describes what's actually in the picture.</p>
-<h2>Try the engine right now</h2><p>Send any public product image URL. You get alt text, search tags and a short description back. This is the live demo box, not a mock.</p>
+<h2>Try it in the browser</h2>
+<p>Paste any public product-image URL. The alt text is generated on our hardware while you wait (about 20 seconds).</p>
+<input id=u style="width:70%;padding:8px" placeholder="https://…/product.jpg"> <input id=ttl style="width:24%;padding:8px" placeholder="Product title (optional)">
+<p><button onclick="go()" id=b>Generate alt text</button></p><pre id=out>—</pre>
+<script>
+const API="https://tin-wallpapers-combines-function.trycloudflare.com";
+async function go(){const o=document.getElementById('out');const b=document.getElementById('b');b.disabled=true;o.textContent='Working… (the model is looking at your image)';
+try{const r=await fetch(API+'/alt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_url:document.getElementById('u').value,product_title:document.getElementById('ttl').value})});
+const j=await r.json();o.textContent=r.ok?('ALT: '+j.alt+'\nTAGS: '+(j.tags||[]).join(', ')+'\nDESC: '+j.long_desc+'\ncost: $'+j.cost_usd):('Error: '+(j.detail||r.status));}catch(e){o.textContent='Could not reach the demo box: '+e}b.disabled=false}
+</script>
+<h2>Or from the command line</h2><p>Send any public product image URL. You get alt text, search tags and a short description back. This is the live demo box, not a mock.</p>
 <pre>curl -X POST https://tin-wallpapers-combines-function.trycloudflare.com/alt \
   -H "Content-Type: application/json" \
   -d '{"image_url":"https://your-store.com/products/mug.jpg","product_title":"Ceramic Mug"}'</pre>
